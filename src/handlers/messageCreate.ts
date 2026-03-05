@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { channelDb } from '../db';
+import { threadDb } from '../db';
 import { enqueue } from '../services/queue';
 
 export async function handleMessageCreate(message: Message): Promise<void> {
@@ -7,12 +7,14 @@ export async function handleMessageCreate(message: Message): Promise<void> {
   if (message.author.bot) return;
   if (!message.guild) return;
 
-  // Only handle messages in registered agent channels
-  const channelInfo = channelDb.get(message.channel.id);
-  if (!channelInfo) return;
-
   // Ignore empty messages (e.g. attachments-only)
   if (!message.content.trim()) return;
+
+  // Only handle messages in registered session threads
+  if (!message.channel.isThread()) return;
+
+  const threadInfo = threadDb.get(message.channel.id);
+  if (!threadInfo) return;
 
   enqueue(message);
 }

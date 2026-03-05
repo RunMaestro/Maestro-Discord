@@ -1,6 +1,6 @@
-import { Message, TextChannel } from 'discord.js';
+import { Message, TextChannel, ThreadChannel } from 'discord.js';
 import { maestro } from './maestro';
-import { channelDb } from '../db';
+import { channelDb, threadDb } from '../db';
 import { splitMessage } from '../utils/splitMessage';
 
 interface QueueEntry {
@@ -31,12 +31,22 @@ async function processNext(channelId: string): Promise<void> {
   processing.add(channelId);
   const { message } = queue.shift()!;
 
-  const channel = message.channel as TextChannel;
-  const channelInfo = channelDb.get(channelId);
+  // Resolve agent/session context — thread takes precedence over channel
+  const isThread = message.channel.isThread();
+  const threadInfo = isThread ? threadDb.get(channelId) : undefined;
+  const channelInfo = threadInfo
+    ? channelDb.get(threadInfo.channel_id)
+    : channelDb.get(channelId);
+
   if (!channelInfo) {
     processing.delete(channelId);
     return;
   }
+
+  const agentId = threadInfo ? threadInfo.agent_id : channelInfo.agent_id;
+  const sessionId = threadInfo ? (threadInfo.session_id ?? undefined) : (channelInfo.session_id ?? undefined);
+
+  const channel = message.channel as TextChannel | ThreadChannel;
 
   // React to show we're working
   let reaction: Awaited<ReturnType<Message['react']>> | undefined;
@@ -53,15 +63,15 @@ async function processNext(channelId: string): Promise<void> {
   channel.sendTyping().catch(() => {});
 
   try {
-    const result = await maestro.send(
-      channelInfo.agent_id,
-      message.content,
-      channelInfo.session_id ?? undefined
-    );
+    const result = await maestro.send(agentId, message.content, sessionId);
 
     // Persist session ID from first response
-    if (!channelInfo.session_id && (result as any).sessionId) {
-      channelDb.updateSession(channelId, (result as any).sessionId);
+    if (!sessionId && result.sessionId) {
+      if (threadInfo) {
+        threadDb.updateSession(channelId, result.sessionId);
+      } else {
+        channelDb.updateSession(channelId, result.sessionId);
+      }
     }
 
     clearInterval(typingInterval);

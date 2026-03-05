@@ -14,6 +14,16 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS agent_threads (
+    thread_id  TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
+    agent_id   TEXT NOT NULL,
+    session_id TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`);
+
 export interface AgentChannel {
   channel_id: string;
   guild_id: string;
@@ -36,7 +46,7 @@ export const channelDb = {
       .get(channelId) as AgentChannel | undefined;
   },
 
-  updateSession(channelId: string, sessionId: string): void {
+  updateSession(channelId: string, sessionId: string | null): void {
     db.prepare('UPDATE agent_channels SET session_id = ? WHERE channel_id = ?')
       .run(sessionId, channelId);
   },
@@ -48,5 +58,39 @@ export const channelDb = {
   listByGuild(guildId: string): AgentChannel[] {
     return db.prepare('SELECT * FROM agent_channels WHERE guild_id = ?')
       .all(guildId) as AgentChannel[];
+  },
+};
+
+export interface AgentThread {
+  thread_id:  string;
+  channel_id: string;
+  agent_id:   string;
+  session_id: string | null;
+  created_at: number;
+}
+
+export const threadDb = {
+  register(threadId: string, channelId: string, agentId: string): void {
+    db.prepare('INSERT INTO agent_threads (thread_id, channel_id, agent_id) VALUES (?, ?, ?)')
+      .run(threadId, channelId, agentId);
+  },
+
+  get(threadId: string): AgentThread | undefined {
+    return db.prepare('SELECT * FROM agent_threads WHERE thread_id = ?')
+      .get(threadId) as AgentThread | undefined;
+  },
+
+  updateSession(threadId: string, sessionId: string | null): void {
+    db.prepare('UPDATE agent_threads SET session_id = ? WHERE thread_id = ?')
+      .run(sessionId, threadId);
+  },
+
+  listByChannel(channelId: string): AgentThread[] {
+    return db.prepare('SELECT * FROM agent_threads WHERE channel_id = ? ORDER BY created_at DESC')
+      .all(channelId) as AgentThread[];
+  },
+
+  remove(threadId: string): void {
+    db.prepare('DELETE FROM agent_threads WHERE thread_id = ?').run(threadId);
   },
 };

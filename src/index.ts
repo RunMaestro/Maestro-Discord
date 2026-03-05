@@ -2,12 +2,14 @@ import { Client, GatewayIntentBits, Interaction } from 'discord.js';
 import { config } from './config';
 import * as health from './commands/health';
 import * as agents from './commands/agents';
+import * as session from './commands/session';
 import './db'; // ensure DB is initialized on startup
 import { handleMessageCreate } from './handlers/messageCreate';
 
 const commands = new Map([
   [health.data.name, health],
   [agents.data.name, agents],
+  [session.data.name, session],
 ]);
 
 const client = new Client({
