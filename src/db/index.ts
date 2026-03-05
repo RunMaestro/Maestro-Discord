@@ -80,7 +80,7 @@ export const threadDb = {
       .get(threadId) as AgentThread | undefined;
   },
 
-  updateSession(threadId: string, sessionId: string): void {
+  updateSession(threadId: string, sessionId: string | null): void {
     db.prepare('UPDATE agent_threads SET session_id = ? WHERE thread_id = ?')
       .run(sessionId, threadId);
   },

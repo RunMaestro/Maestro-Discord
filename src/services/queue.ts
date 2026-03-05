@@ -43,7 +43,7 @@ async function processNext(channelId: string): Promise<void> {
     return;
   }
 
-  const agentId = channelInfo.agent_id;
+  const agentId = threadInfo ? threadInfo.agent_id : channelInfo.agent_id;
   const sessionId = threadInfo ? (threadInfo.session_id ?? undefined) : (channelInfo.session_id ?? undefined);
 
   const channel = message.channel as TextChannel | ThreadChannel;
