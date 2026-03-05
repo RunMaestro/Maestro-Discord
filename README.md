@@ -69,7 +69,7 @@ npm start
 | `/agents disconnect` | (Run inside an agent channel) Remove and delete the channel |
 | `/session` | Show session info for the current agent channel |
 
-Once an agent channel is created, type messages in it. Messages are relayed to the agent and the response is posted back. A ⏳ reaction indicates a message is waiting in the queue.
+When an agent channel is created, it spins up a dedicated thread for that agent. Type messages inside the thread. Messages are relayed to the agent and the response is posted back. A ⏳ reaction indicates a message is waiting in the queue.
 
 ## Discord bot permissions
 
