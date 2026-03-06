@@ -62,7 +62,13 @@ npm start
 ## Tests
 
 ```bash
-npm test
+node --test --import tsx
+```
+
+Coverage:
+
+```bash
+node --test --experimental-test-coverage --import tsx
 ```
 
 ## Slash commands
