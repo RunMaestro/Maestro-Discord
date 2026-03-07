@@ -43,12 +43,42 @@ export interface SendResult {
   };
 }
 
+export interface MaestroPlaybook {
+  id: string;
+  name: string;
+  description: string;
+  documentCount: number;
+  taskCount: number;
+  agentId?: string;
+  agentName?: string;
+  [key: string]: unknown;
+}
+
+export interface MaestroPlaybookDetail extends MaestroPlaybook {
+  documents: Array<{
+    path: string;
+    taskCount: number;
+    completedCount: number;
+  }>;
+}
+
+export interface PlaybookEvent {
+  type: 'start' | 'document_start' | 'task_start' | 'task_complete' | 'document_complete' | 'loop_complete' | 'complete';
+  timestamp: number;
+  success?: boolean;
+  summary?: string;
+  totalTasksCompleted?: number;
+  totalElapsedMs?: number;
+  totalCost?: number;
+  [key: string]: unknown;
+}
+
 // --- Helpers ---
 
 async function run(args: string[]): Promise<string> {
   try {
     const { stdout } = (await execFileAsync('maestro-cli', args, {
-      timeout: 5 * 60 * 1000, // 5 min timeout for long agent responses
+      timeout: 30 * 60 * 1000, // 30 min timeout for playbook runs
     })) as { stdout: string; stderr: string };
     return stdout.trim();
   } catch (err: unknown) {
@@ -93,5 +123,28 @@ export const maestro = {
     if (sessionId) args.push('-s', sessionId);
     const raw = await run(args);
     return JSON.parse(raw) as SendResult;
+  },
+
+  /** List all playbooks, optionally filtered by agent */
+  async listPlaybooks(agentId?: string): Promise<MaestroPlaybook[]> {
+    const args = ['list', 'playbooks', '--json'];
+    if (agentId) args.push('-a', agentId);
+    const raw = await run(args);
+    return JSON.parse(raw) as MaestroPlaybook[];
+  },
+
+  /** Show detailed info for a single playbook */
+  async showPlaybook(playbookId: string): Promise<MaestroPlaybookDetail> {
+    const raw = await run(['show', 'playbook', playbookId, '--json']);
+    return JSON.parse(raw) as MaestroPlaybookDetail;
+  },
+
+  /** Run a playbook and return the final completion event. Uses --wait so the CLI blocks until done. */
+  async runPlaybook(playbookId: string): Promise<PlaybookEvent> {
+    const raw = await run(['playbook', playbookId, '--wait']);
+    // --wait streams JSONL events; the last line is the "complete" event
+    const lines = raw.trim().split('\n');
+    const lastLine = lines[lines.length - 1];
+    return JSON.parse(lastLine) as PlaybookEvent;
   },
 };
