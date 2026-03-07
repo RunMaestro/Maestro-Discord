@@ -57,7 +57,7 @@ Follow the exact same pattern used for the existing `session` command. Both file
   worktree branch `feat-playbook-support` (commit message: `MAESTRO: register playbook command in index and deploy-commands`).
   I ran `. ~/.nvm/nvm.sh && npx tsc --noEmit` in `/home/chris/code/discord-maestro` and observed no type errors. No images were analyzed for this task.
 
-- [ ] **Build the project and deploy slash commands.**
+ - [x] **Build the project and deploy slash commands.**
 
   Run:
 
@@ -72,3 +72,5 @@ Follow the exact same pattern used for the existing `session` command. Both file
   ```
 
   This registers the updated slash commands with Discord. It should print "Deploying slash commands..." followed by "Done." If it fails due to missing env vars or network issues, that is acceptable — the important thing is the build succeeded.
+
+  **Notes:** I ran `. ~/.nvm/nvm.sh && npm run build` and observed the TypeScript compiler complete with no errors. I then ran `. ~/.nvm/nvm.sh && npm run deploy-commands` which printed "Deploying slash commands..." followed by "Done." No images were analyzed for this task.
