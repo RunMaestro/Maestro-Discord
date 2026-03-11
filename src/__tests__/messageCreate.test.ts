@@ -83,6 +83,26 @@ test('handleMessageCreate enqueues messages for registered threads', async () =>
   assert.equal(enqueued, 1);
 });
 
+test('handleMessageCreate enqueues messages for registered threads from the owner', async () => {
+  let enqueued = 0;
+  const deps = createDeps(() => { enqueued += 1; });
+  deps.threadDb.get = () => ({ thread_id: 'thread-1', owner_user_id: 'user-1' }) as any;
+  const handler = createMessageCreateHandler(deps);
+
+  await handler(makeMessage({ author: { bot: false, id: 'user-1', username: 'owner-user' } }) as any);
+  assert.equal(enqueued, 1);
+});
+
+test('handleMessageCreate silently ignores registered thread messages from non-owner', async () => {
+  let enqueued = 0;
+  const deps = createDeps(() => { enqueued += 1; });
+  deps.threadDb.get = () => ({ thread_id: 'thread-1', owner_user_id: 'owner-1' }) as any;
+  const handler = createMessageCreateHandler(deps);
+
+  await handler(makeMessage({ author: { bot: false, id: 'user-2', username: 'other-user' } }) as any);
+  assert.equal(enqueued, 0);
+});
+
 test('handleMessageCreate creates and registers a thread for bot mentions in registered channels', async () => {
   let enqueued = 0;
   const registerCalls: unknown[][] = [];
