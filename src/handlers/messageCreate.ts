@@ -1,9 +1,11 @@
 import { Message } from 'discord.js';
-import { threadDb } from '../db';
+import { channelDb, threadDb } from '../db';
 import { enqueue } from '../services/queue';
 
 type MessageCreateDeps = {
-  threadDb: Pick<typeof threadDb, 'get'>;
+  channelDb: Pick<typeof channelDb, 'get'>;
+  threadDb: Pick<typeof threadDb, 'get' | 'register'>;
+  getBotUserId: (message: Message) => string | undefined;
   enqueue: (message: Message) => void;
 };
 
@@ -26,4 +28,9 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
   };
 }
 
-export const handleMessageCreate = createMessageCreateHandler({ threadDb, enqueue });
+export const handleMessageCreate = createMessageCreateHandler({
+  channelDb,
+  threadDb,
+  getBotUserId: (message) => message.client.user?.id,
+  enqueue,
+});
