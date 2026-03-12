@@ -7,6 +7,7 @@ type MessageCreateDeps = {
   threadDb: Pick<typeof threadDb, 'get' | 'register'>;
   getBotUserId: (message: Message) => string | undefined;
   enqueue: (message: Message) => void;
+  logger?: Pick<Console, 'warn'>;
 };
 
 export function createMessageCreateHandler(deps: MessageCreateDeps) {
@@ -19,7 +20,14 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
     if (!message.content.trim()) return;
 
     const botUserId = deps.getBotUserId(message);
-    if (!botUserId) return;
+    if (!botUserId) {
+      if (deps.logger?.warn) {
+        deps.logger.warn('messageCreate: bot user ID missing, skipping message handling');
+      } else {
+        console.warn('messageCreate: bot user ID missing, skipping message handling');
+      }
+      return;
+    }
 
     if (!message.channel.isThread()) {
       const channelInfo = deps.channelDb.get(message.channel.id);
@@ -62,4 +70,5 @@ export const handleMessageCreate = createMessageCreateHandler({
   threadDb,
   getBotUserId: (message) => message.client.user?.id,
   enqueue,
+  logger: console,
 });

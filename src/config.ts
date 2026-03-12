@@ -8,17 +8,13 @@ export function required(key: string): string {
 }
 
 function requiredCsv(key: string): string[] {
-  const val = required(key);
-  const parsed = val
+  const val = process.env[key];
+  if (!val) return [];
+
+  return val
     .split(',')
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
-
-  if (parsed.length === 0) {
-    throw new Error(`Env var ${key} must contain at least one value`);
-  }
-
-  return parsed;
 }
 
 export const config = {
