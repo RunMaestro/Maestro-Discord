@@ -160,7 +160,7 @@ export const maestro = {
       const line = lines[i];
       try {
         const parsed = JSON.parse(line) as Record<string, unknown>;
-        if ((parsed.type === 'complete' || parsed.event === 'complete') && typeof parsed.timestamp === 'number') {
+        if (parsed.type === 'complete' && typeof parsed.timestamp === 'number') {
           return parsed as PlaybookEvent;
         }
       } catch {

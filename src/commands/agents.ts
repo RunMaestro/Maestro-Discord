@@ -66,11 +66,17 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
   if (current) chunks.push(current);
 
   // Discord allows up to 10 embeds per message
-  const embeds = chunks.slice(0, 10).map((chunk, i) => {
+  const visibleChunks = chunks.slice(0, 10);
+  const truncated = chunks.length > 10;
+  const embeds = visibleChunks.map((chunk, i) => {
     const embed = new EmbedBuilder().setColor(0x5865f2).setDescription(chunk);
     if (i === 0) embed.setTitle('Maestro Agents');
-    if (i === chunks.length - 1)
-      embed.setFooter({ text: 'Use /agents new <agent-id> to start a conversation' });
+    if (i === visibleChunks.length - 1) {
+      const footerText = truncated
+        ? `Showing ${visibleChunks.length} of ${chunks.length} pages — some agents are hidden. Use /agents new <agent-id> to start a conversation`
+        : 'Use /agents new <agent-id> to start a conversation';
+      embed.setFooter({ text: footerText });
+    }
     return embed;
   });
 

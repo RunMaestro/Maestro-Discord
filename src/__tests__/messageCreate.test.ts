@@ -126,6 +126,7 @@ test('handleMessageCreate creates and registers a thread for bot mentions in reg
               id: 'thread-new-1',
               send: async (text: string) => {
                 sentMessages.push(text);
+                return { id: 'msg-forwarded', content: text };
               },
             };
           },
@@ -134,9 +135,9 @@ test('handleMessageCreate creates and registers a thread for bot mentions in reg
     }) as any
   );
 
-  assert.equal(enqueued, 0);
+  assert.equal(enqueued, 1);
   assert.deepEqual(registerCalls, [['thread-new-1', 'channel-1', 'agent-1', 'user-1']]);
-  assert.deepEqual(sentMessages, ['This thread is bound to <@user-1>.']);
+  assert.deepEqual(sentMessages, ['This thread is bound to <@user-1>.', 'hello']);
 });
 
 test('handleMessageCreate creates and registers a thread when mention metadata includes bot', async () => {
@@ -157,7 +158,7 @@ test('handleMessageCreate creates and registers a thread when mention metadata i
         threads: {
           create: async () => ({
             id: 'thread-new-2',
-            send: async () => undefined,
+            send: async (text: string) => ({ id: 'msg-fwd', content: text }),
           }),
         },
       },
