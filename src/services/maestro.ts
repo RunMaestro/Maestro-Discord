@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
@@ -82,7 +82,6 @@ type RunOptions = {
 };
 
 const DEFAULT_TIMEOUT_MS = 30 * 1000;
-const SEND_TIMEOUT_MS = 5 * 60 * 1000; // 5 min — agent responses can take a while
 const DEFAULT_MAX_BUFFER = 10 * 1024 * 1024; // 10MB
 
 async function run(args: string[], opts: RunOptions = {}): Promise<string> {
@@ -104,6 +103,44 @@ async function run(args: string[], opts: RunOptions = {}): Promise<string> {
     console.error(`[maestro-cli ${args[0]}] ${detail}`);
     throw new Error(`maestro-cli ${args[0]} failed: ${detail}`);
   }
+}
+
+/**
+ * Spawn maestro-cli without a timeout. Used for agent send operations where
+ * response times are unpredictable (research tasks, complex code generation).
+ * Collects stdout/stderr and resolves when the process exits.
+ */
+function runSpawn(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('maestro-cli', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const chunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+
+    child.stdout.on('data', (data: Buffer) => chunks.push(data));
+    child.stderr.on('data', (data: Buffer) => stderrChunks.push(data));
+
+    child.on('error', (err) => {
+      console.error(`[maestro-cli ${args[0]}] spawn error: ${err.message}`);
+      reject(new Error(`maestro-cli ${args[0]} failed: spawn error: ${err.message}`));
+    });
+
+    child.on('close', (code) => {
+      const stdout = Buffer.concat(chunks).toString().trim();
+      const stderr = Buffer.concat(stderrChunks).toString().trim();
+
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        const parts: string[] = [];
+        if (code !== null) parts.push(`exit code: ${code}`);
+        if (stderr) parts.push(`stderr: ${stderr}`);
+        if (stdout) parts.push(`stdout: ${stdout}`);
+        const detail = parts.join(' | ');
+        console.error(`[maestro-cli ${args[0]}] ${detail}`);
+        reject(new Error(`maestro-cli ${args[0]} failed: ${detail}`));
+      }
+    });
+  });
 }
 
 // --- Service ---
@@ -141,7 +178,7 @@ export const maestro = {
     if (sessionId) args.push('-s', sessionId);
     if (readOnly) args.push('-r');
     try {
-      const raw = await run(args, { timeoutMs: SEND_TIMEOUT_MS });
+      const raw = await runSpawn(args);
       return JSON.parse(raw) as SendResult;
     } catch (err: unknown) {
       // CLI may exit non-zero but still return valid JSON (e.g. read-only rejection)
