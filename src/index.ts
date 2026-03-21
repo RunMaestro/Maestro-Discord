@@ -25,6 +25,18 @@ client.once('ready', (c) => {
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
+  if (interaction.isAutocomplete()) {
+    const cmd = commands.get(interaction.commandName) as { autocomplete?: (i: typeof interaction) => Promise<void> };
+    if (cmd?.autocomplete) {
+      try {
+        await cmd.autocomplete(interaction);
+      } catch (err) {
+        console.error('Autocomplete error:', err);
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
   if (
     config.allowedUserIds.length > 0 &&

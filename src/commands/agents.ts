@@ -1,4 +1,5 @@
 import {
+  AutocompleteInteraction,
   ChatInputCommandInteraction,
   SlashCommandBuilder,
   EmbedBuilder,
@@ -19,8 +20,9 @@ export const data = new SlashCommandBuilder()
       .addStringOption((opt) =>
         opt
           .setName('agent')
-          .setDescription('Agent ID or unique prefix (from /agents list)')
+          .setDescription('Select an agent')
           .setRequired(true)
+          .setAutocomplete(true)
       )
   )
   .addSubcommand((sub) => sub.setName('disconnect').setDescription('Remove this agent channel (deletes the channel)'))
@@ -36,6 +38,22 @@ export const data = new SlashCommandBuilder()
           .addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' })
       )
   );
+
+export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
+  const focused = interaction.options.getFocused().toLowerCase();
+
+  try {
+    const agents = await maestro.listAgents();
+    const filtered = agents.filter(
+      (a) => a.name.toLowerCase().includes(focused) || a.id.toLowerCase().includes(focused)
+    );
+    await interaction.respond(
+      filtered.slice(0, 25).map((a) => ({ name: `${a.name} (${a.toolType})`, value: a.id }))
+    );
+  } catch {
+    await interaction.respond([]);
+  }
+}
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const sub = interaction.options.getSubcommand();
