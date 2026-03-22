@@ -25,11 +25,28 @@ client.once('ready', (c) => {
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-  if (
+  const isUnauthorized =
     config.allowedUserIds.length > 0 &&
-    !config.allowedUserIds.includes(interaction.user.id)
-  ) {
+    !config.allowedUserIds.includes(interaction.user.id);
+
+  if (interaction.isAutocomplete()) {
+    if (isUnauthorized) {
+      await interaction.respond([]);
+      return;
+    }
+    const cmd = commands.get(interaction.commandName) as { autocomplete?: (i: typeof interaction) => Promise<void> };
+    if (cmd?.autocomplete) {
+      try {
+        await cmd.autocomplete(interaction);
+      } catch (err) {
+        console.error('Autocomplete error:', err);
+      }
+    }
+    return;
+  }
+
+  if (!interaction.isChatInputCommand()) return;
+  if (isUnauthorized) {
     await interaction.reply({
       content: '❌ You are not authorized to use this bot.',
       ephemeral: true,
