@@ -2,6 +2,7 @@ import { Message, TextChannel, ThreadChannel } from 'discord.js';
 import { maestro } from './maestro';
 import { channelDb, threadDb } from '../db';
 import { splitMessage } from '../utils/splitMessage';
+import { logger } from './logger';
 
 interface QueueEntry {
   message: Message;
@@ -88,6 +89,7 @@ async function processNext(channelId: string): Promise<void> {
     if (!result.success || !result.response) {
       const reason = result.error ?? 'The agent could not complete this request.';
       const hint = readOnly ? '\n-# The agent is in **read-only** mode and cannot modify files.' : '';
+      void logger.error('queue:agent-failure', `agent=${agentId} session=${sessionId ?? 'new'} channel=${channelId} reason=${reason}`);
       await channel.send(`⚠️ ${reason}${hint}`);
     } else {
       // Post response, splitting if > 2000 chars
@@ -98,10 +100,11 @@ async function processNext(channelId: string): Promise<void> {
     }
 
     // Post usage footer as a subtle follow-up
-    const cost = result.usage.totalCostUsd.toFixed(4);
-    const ctx = result.usage.contextUsagePercent.toFixed(1);
+    const cost = (result.usage?.totalCostUsd ?? 0).toFixed(4);
+    const ctx = (result.usage?.contextUsagePercent ?? 0).toFixed(1);
+    const tokens = (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0);
     await channel.send(
-      `-# 💬 ${result.usage.inputTokens + result.usage.outputTokens} tokens • $${cost} • ${ctx}% context${readOnly ? ' • 📖 read-only' : ''}`
+      `-# 💬 ${tokens} tokens • $${cost} • ${ctx}% context${readOnly ? ' • 📖 read-only' : ''}`
     );
 
   } catch (err) {
@@ -111,6 +114,7 @@ async function processNext(channelId: string): Promise<void> {
     } catch {}
 
     const errMsg = err instanceof Error ? err.message : String(err);
+    void logger.error('queue:send-error', `agent=${agentId} session=${sessionId ?? 'new'} channel=${channelId} error=${errMsg}`);
     await channel.send(`❌ Failed to get response from agent:\n\`\`\`\n${errMsg}\n\`\`\``);
   }
 
