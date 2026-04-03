@@ -168,8 +168,8 @@ test('queue handles attachment download failure gracefully', async () => {
   await settle();
 
   // Should log the error
-  assert.equal((deps.logger.error as ReturnType<typeof mock.fn>).mock.callCount(), 1);
-  const logArgs = (deps.logger.error as ReturnType<typeof mock.fn>).mock.calls[0].arguments;
+  assert.equal((deps.logger.error as unknown as ReturnType<typeof mock.fn>).mock.callCount(), 1);
+  const logArgs = (deps.logger.error as unknown as ReturnType<typeof mock.fn>).mock.calls[0].arguments;
   assert.equal(logArgs[0], 'queue:attachment-download');
   assert.ok((logArgs[1] as string).includes('Network timeout'));
 

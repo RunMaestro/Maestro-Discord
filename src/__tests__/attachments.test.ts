@@ -8,6 +8,7 @@ import type { Attachment } from 'discord.js';
 import {
   downloadAttachments,
   formatAttachmentRefs,
+  cleanupAgentFiles,
   MAX_FILE_SIZE,
   FILES_DIR,
   DownloadedFile,
@@ -147,4 +148,24 @@ test('formatAttachmentRefs produces correct format', () => {
 
 test('formatAttachmentRefs returns empty string for empty array', () => {
   assert.equal(formatAttachmentRefs([]), '');
+});
+
+// --- cleanupAgentFiles tests ---
+
+test('cleanupAgentFiles removes the discord-files directory', async () => {
+  // Create the directory structure with a file inside
+  const filesDir = path.join(tmpDir, FILES_DIR);
+  const { mkdir, writeFile } = await import('fs/promises');
+  await mkdir(filesDir, { recursive: true });
+  await writeFile(path.join(filesDir, 'test.txt'), 'content');
+
+  await cleanupAgentFiles(tmpDir);
+
+  // Directory should no longer exist
+  await assert.rejects(() => stat(path.join(tmpDir, FILES_DIR)), { code: 'ENOENT' });
+});
+
+test('cleanupAgentFiles does not throw if directory does not exist', async () => {
+  // tmpDir exists but has no .maestro/discord-files/ subdirectory
+  await assert.doesNotReject(() => cleanupAgentFiles(tmpDir));
 });
