@@ -90,12 +90,18 @@ export function createQueue(deps: QueueDeps) {
       // Download attachments if present
       let attachmentRefs = '';
       if (message.attachments.size > 0) {
-        const agentCwd = await deps.maestro.getAgentCwd(agentId);
-        if (agentCwd) {
-          const downloaded = await deps.downloadAttachments(message.attachments, agentCwd);
-          attachmentRefs = deps.formatAttachmentRefs(downloaded);
-        } else {
-          await channel.send('⚠️ Could not resolve agent working directory for file downloads.');
+        try {
+          const agentCwd = await deps.maestro.getAgentCwd(agentId);
+          if (agentCwd) {
+            const downloaded = await deps.downloadAttachments(message.attachments, agentCwd);
+            attachmentRefs = deps.formatAttachmentRefs(downloaded);
+          } else {
+            await channel.send('⚠️ Could not resolve agent working directory for file downloads.');
+          }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          void deps.logger.error('queue:attachment-download', `agent=${agentId} channel=${channelId} error=${errMsg}`);
+          await channel.send('⚠️ Failed to download one or more attachments. Sending message without them.');
         }
       }
 

@@ -149,6 +149,44 @@ test('queue sends only attachment refs when message content is empty', async () 
   assert.equal(sentMessage, '[Attached: /home/agent/.maestro/discord-files/456-img.png]');
 });
 
+test('queue handles attachment download failure gracefully', async () => {
+  const deps = createMockDeps();
+  deps._mocks.download.mock.mockImplementation(async () => {
+    throw new Error('Network timeout');
+  });
+
+  const { enqueue } = createQueue(deps);
+  const msg = makeMessage({
+    content: 'check this file',
+    attachments: {
+      size: 1,
+      values: () => [{ url: 'https://cdn.example.com/file.txt', name: 'file.txt', size: 100 }],
+    },
+  });
+
+  enqueue(msg);
+  await settle();
+
+  // Should log the error
+  assert.equal((deps.logger.error as ReturnType<typeof mock.fn>).mock.callCount(), 1);
+  const logArgs = (deps.logger.error as ReturnType<typeof mock.fn>).mock.calls[0].arguments;
+  assert.equal(logArgs[0], 'queue:attachment-download');
+  assert.ok((logArgs[1] as string).includes('Network timeout'));
+
+  // Should warn the user
+  const sendCalls = msg.channel.send.mock.calls;
+  const warningCall = sendCalls.find(
+    (c: { arguments: unknown[] }) =>
+      typeof c.arguments[0] === 'string' &&
+      c.arguments[0].includes('Failed to download one or more attachments'),
+  );
+  assert.ok(warningCall, 'Expected a warning about failed downloads');
+
+  // Should still send the message text to the agent (without attachment refs)
+  assert.equal(deps._mocks.send.mock.callCount(), 1);
+  assert.equal(deps._mocks.send.mock.calls[0].arguments[1], 'check this file');
+});
+
 test('queue warns when agent cwd cannot be resolved for attachments', async () => {
   const deps = createMockDeps();
   deps._mocks.getAgentCwd.mock.mockImplementation(async () => null);
