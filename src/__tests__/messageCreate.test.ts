@@ -8,6 +8,7 @@ function makeMessage(overrides: Partial<Record<string, unknown>> = {}) {
     member: { displayName: 'Test User' },
     guild: { id: 'guild-1' },
     content: 'hello',
+    attachments: { size: 0, values: () => [] },
     mentions: { users: { has: () => false } },
     channel: {
       id: 'thread-1',
@@ -45,12 +46,23 @@ test('handleMessageCreate ignores DMs', async () => {
   assert.equal(enqueued, 0);
 });
 
-test('handleMessageCreate ignores empty messages', async () => {
+test('handleMessageCreate ignores messages with no text and no attachments', async () => {
   let enqueued = 0;
   const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
 
-  await handler(makeMessage({ content: '   ' }) as any);
+  await handler(makeMessage({ content: '   ', attachments: { size: 0, values: () => [] } }) as any);
   assert.equal(enqueued, 0);
+});
+
+test('handleMessageCreate allows attachment-only messages (no text)', async () => {
+  let enqueued = 0;
+  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+
+  await handler(makeMessage({
+    content: '',
+    attachments: { size: 1, values: () => [{ url: 'https://example.com/file.png', name: 'file.png' }] },
+  }) as any);
+  assert.equal(enqueued, 1);
 });
 
 test('handleMessageCreate ignores non-thread channels', async () => {
@@ -124,9 +136,10 @@ test('handleMessageCreate creates and registers a thread for bot mentions in reg
             assert.ok(name.includes('Test-User'));
             return {
               id: 'thread-new-1',
-              send: async (text: string) => {
+              send: async (msg: string | { content?: string; files?: string[] }) => {
+                const text = typeof msg === 'string' ? msg : (msg.content ?? '');
                 sentMessages.push(text);
-                return { id: 'msg-forwarded', content: text };
+                return { id: 'msg-forwarded', content: text, attachments: { size: 0, values: () => [] } };
               },
             };
           },
@@ -158,7 +171,10 @@ test('handleMessageCreate creates and registers a thread when mention metadata i
         threads: {
           create: async () => ({
             id: 'thread-new-2',
-            send: async (text: string) => ({ id: 'msg-fwd', content: text }),
+            send: async (msg: string | { content?: string; files?: string[] }) => {
+              const text = typeof msg === 'string' ? msg : (msg.content ?? '');
+              return { id: 'msg-fwd', content: text, attachments: { size: 0, values: () => [] } };
+            },
           }),
         },
       },

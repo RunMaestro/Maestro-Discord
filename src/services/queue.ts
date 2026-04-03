@@ -2,6 +2,7 @@ import { Message, TextChannel, ThreadChannel } from 'discord.js';
 import { maestro } from './maestro';
 import { channelDb, threadDb } from '../db';
 import { splitMessage } from '../utils/splitMessage';
+import { downloadAttachments, formatAttachmentRefs } from '../utils/attachments';
 import { logger } from './logger';
 
 interface QueueEntry {
@@ -64,8 +65,21 @@ async function processNext(channelId: string): Promise<void> {
   channel.sendTyping().catch(() => {});
 
   try {
+    // Download attachments if present
+    let attachmentRefs = '';
+    if (message.attachments.size > 0) {
+      const agentCwd = await maestro.getAgentCwd(agentId);
+      if (agentCwd) {
+        const downloaded = await downloadAttachments(message.attachments, agentCwd);
+        attachmentRefs = formatAttachmentRefs(downloaded);
+      } else {
+        await channel.send('⚠️ Could not resolve agent working directory for file downloads.');
+      }
+    }
+
     const readOnly = !!channelInfo.read_only;
-    const result = await maestro.send(agentId, message.content, sessionId, readOnly);
+    const fullMessage = [message.content, attachmentRefs].filter(Boolean).join('\n\n');
+    const result = await maestro.send(agentId, fullMessage, sessionId, readOnly);
 
     // Persist session ID from first response
     if (!sessionId && result.sessionId) {
