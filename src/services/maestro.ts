@@ -143,6 +143,18 @@ function runSpawn(args: string[]): Promise<string> {
   });
 }
 
+// --- Agent CWD cache ---
+
+let agentCwdCache: Map<string, string> | null = null;
+let agentCwdCacheTime = 0;
+export const AGENT_CWD_CACHE_TTL = 60_000; // 60 seconds
+
+/** Reset the agent CWD cache (exported for testing). */
+export function resetAgentCwdCache(): void {
+  agentCwdCache = null;
+  agentCwdCacheTime = 0;
+}
+
 // --- Service ---
 
 export const maestro = {
@@ -160,6 +172,17 @@ export const maestro = {
   async listAgents(): Promise<MaestroAgent[]> {
     const raw = await run(['list', 'agents', '--json']);
     return JSON.parse(raw) as MaestroAgent[];
+  },
+
+  /** Look up an agent's cwd by ID, with a TTL cache to avoid repeated CLI calls. */
+  async getAgentCwd(agentId: string): Promise<string | null> {
+    const now = Date.now();
+    if (!agentCwdCache || now - agentCwdCacheTime > AGENT_CWD_CACHE_TTL) {
+      const agents = await this.listAgents();
+      agentCwdCache = new Map(agents.map(a => [a.id, a.cwd]));
+      agentCwdCacheTime = now;
+    }
+    return agentCwdCache.get(agentId) ?? null;
   },
 
   /** List sessions for a given agent */
