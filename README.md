@@ -39,6 +39,7 @@ DISCORD_BOT_TOKEN=   # Bot token from Discord Developer Portal
 DISCORD_CLIENT_ID=   # Application ID from Discord Developer Portal
 DISCORD_GUILD_ID=    # Your server's ID (right-click server → Copy ID)
 DISCORD_ALLOWED_USER_IDS=123,456  # Optional: comma-separated user IDs allowed to run slash commands
+API_PORT=3457                     # Optional: port for internal API (default 3457)
 ```
 
 3. Deploy slash commands:
@@ -92,6 +93,30 @@ node --test --experimental-test-coverage --import tsx
 - Messages in registered, owner-authorized threads are queued and forwarded to `maestro-cli`.
 - The bot adds a ⏳ reaction while waiting, shows typing, and splits long replies.
 - After each response, it posts a small usage footer with tokens, cost, and context.
+
+## Maestro-to-Discord Messaging
+
+Maestro agents can send messages to Discord using the `maestro-discord` CLI.
+The bot exposes a local HTTP API that the CLI calls.
+
+### Setup
+
+The API server starts automatically with the bot on port 3457 (configurable via `API_PORT` in `.env`).
+
+### Usage
+
+```bash
+# Send a message to an agent's Discord channel
+maestro-discord --agent <agent-id> --message "Hello from Maestro"
+
+# Send with @mention for users in the channel
+maestro-discord --agent <agent-id> --message "Build complete!" --mention
+
+# Use a custom port
+maestro-discord --agent <agent-id> --message "Hello" --port 4000
+```
+
+If the agent doesn't have a connected Discord channel yet, one is created automatically.
 
 ## Data storage
 

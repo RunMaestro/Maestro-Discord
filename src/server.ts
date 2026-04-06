@@ -82,6 +82,13 @@ function sendJson(res: http.ServerResponse, status: number, data: object) {
 }
 
 async function handleSend(client: Client, req: http.IncomingMessage, res: http.ServerResponse) {
+  // Client readiness check
+  if (!client.isReady()) {
+    await logger.error('api', 'Bot is not connected to Discord');
+    sendJson(res, 503, { success: false, error: 'Bot is not connected to Discord' });
+    return;
+  }
+
   // Validate Content-Type
   const contentType = req.headers['content-type'] || '';
   if (!contentType.includes('application/json')) {
@@ -153,17 +160,25 @@ async function handleSend(client: Client, req: http.IncomingMessage, res: http.S
         break;
       } catch (err) {
         lastError = err as Error;
-        const retryAfter = (err as { retryAfter?: number }).retryAfter;
-        if (retryAfter) {
-          await new Promise((r) => setTimeout(r, retryAfter));
-        } else {
+        const discordErr = err as { status?: number; retryAfter?: number };
+        const isRateLimited = discordErr.status === 429 || discordErr.retryAfter != null;
+        if (isRateLimited && discordErr.retryAfter) {
+          await new Promise((r) => setTimeout(r, discordErr.retryAfter));
+        } else if (!isRateLimited) {
           break; // non-rate-limit error, don't retry
         }
       }
     }
     if (lastError) {
-      await logger.error('server/send', lastError.message);
-      sendJson(res, 429, { success: false, error: lastError.message });
+      const discordErr = lastError as Error & { status?: number; retryAfter?: number };
+      const isRateLimited = discordErr.status === 429 || discordErr.retryAfter != null;
+      if (isRateLimited) {
+        await logger.error('api', 'Rate limited by Discord after 3 retries');
+        sendJson(res, 429, { success: false, error: 'Rate limited by Discord, retry later' });
+      } else {
+        await logger.error('api', lastError.message);
+        sendJson(res, 500, { success: false, error: lastError.message });
+      }
       return;
     }
   }
