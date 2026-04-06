@@ -127,6 +127,18 @@ curl http://127.0.0.1:3457/api/health
 
 Returns `{"success":true,"status":"ok","uptime":123.45}` when the bot is connected.
 
+### API error codes
+
+| Status | Meaning |
+|--------|---------|
+| `200` | Success |
+| `400` | Missing/invalid fields or malformed JSON |
+| `404` | Agent not found in Maestro |
+| `413` | Request body exceeds 1 MB |
+| `415` | Wrong Content-Type (must be `application/json`) |
+| `429` | Rate limited by Discord after 3 retries |
+| `503` | Bot not connected to Discord |
+
 ## Data storage
 
 The bot stores channel ↔ agent mappings in a local SQLite database at `maestro-bot.db`.
