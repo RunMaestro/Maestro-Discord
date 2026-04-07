@@ -70,6 +70,11 @@ export const channelDb = {
     db.prepare('DELETE FROM agent_channels WHERE channel_id = ?').run(channelId);
   },
 
+  getByAgentId(agentId: string): AgentChannel[] {
+    return db.prepare('SELECT * FROM agent_channels WHERE agent_id = ?')
+      .all(agentId) as AgentChannel[];
+  },
+
   listByGuild(guildId: string): AgentChannel[] {
     return db.prepare('SELECT * FROM agent_channels WHERE guild_id = ?')
       .all(guildId) as AgentChannel[];
@@ -110,5 +115,14 @@ export const threadDb = {
 
   remove(threadId: string): void {
     db.prepare('DELETE FROM agent_threads WHERE thread_id = ?').run(threadId);
+  },
+
+  getByAgentId(agentId: string): AgentThread[] {
+    return db.prepare('SELECT * FROM agent_threads WHERE agent_id = ?')
+      .all(agentId) as AgentThread[];
+  },
+
+  removeByChannel(channelId: string): void {
+    db.prepare('DELETE FROM agent_threads WHERE channel_id = ?').run(channelId);
   },
 };

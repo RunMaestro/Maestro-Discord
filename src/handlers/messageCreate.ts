@@ -16,8 +16,8 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
     if (message.author.bot) return;
     if (!message.guild) return;
 
-    // Ignore empty messages (e.g. attachments-only)
-    if (!message.content.trim()) return;
+    // Ignore empty messages (no text and no attachments)
+    if (!message.content.trim() && message.attachments.size === 0) return;
 
     const botUserId = deps.getBotUserId(message);
     if (!botUserId) {
@@ -68,8 +68,17 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
           ? new RegExp(`<@!?${botUserId}>|<@&${botRoleId}>`, 'g')
           : new RegExp(`<@!?${botUserId}>`, 'g');
         const cleanContent = message.content.replace(mentionPattern, '').trim();
-        if (cleanContent) {
-          const threadMessage = await thread.send(cleanContent);
+        if (cleanContent || message.attachments.size > 0) {
+          // Re-upload attachments so the thread message has real discord.js
+          // Attachment objects (sending bare URLs produces attachments.size===0).
+          const files = [...message.attachments.values()].map(a => ({
+            attachment: a.url,
+            name: a.name,
+          }));
+          const threadMessage = await thread.send({
+            content: cleanContent || undefined,
+            files: files.length > 0 ? files : undefined,
+          });
           deps.enqueue(threadMessage);
         }
       } catch (err) {
