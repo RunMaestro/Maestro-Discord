@@ -51,6 +51,11 @@ export const channelDb = {
       .get(channelId) as AgentChannel | undefined;
   },
 
+  getByAgentId(agentId: string): AgentChannel | undefined {
+    return db.prepare('SELECT * FROM agent_channels WHERE agent_id = ?')
+      .get(agentId) as AgentChannel | undefined;
+  },
+
   updateSession(channelId: string, sessionId: string | null): void {
     db.prepare('UPDATE agent_channels SET session_id = ? WHERE channel_id = ?')
       .run(sessionId, channelId);

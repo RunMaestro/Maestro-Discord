@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "description": "Discord Maestro Bot",
   "main": "dist/index.js",
+  "bin": {
+    "maestro-discord": "dist/cli/maestro-discord.js"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "deploy-commands": "tsx src/deploy-commands.ts",
-    "test": "npm run build && node --test dist/__tests__/**/*.test.js"
+    "test": "npm run build && node --test dist/__tests__/**/*.test.js",
+    "maestro-discord": "tsx src/cli/maestro-discord.ts"
   },
   "keywords": [],
   "author": "",

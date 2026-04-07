@@ -5,6 +5,7 @@ import * as agents from './commands/agents';
 import * as session from './commands/session';
 import './db'; // ensure DB is initialized on startup
 import { handleMessageCreate } from './handlers/messageCreate';
+import { startServer } from './server';
 
 const commands = new Map([
   [health.data.name, health],
@@ -20,8 +21,11 @@ const client = new Client({
   ],
 });
 
+let server: ReturnType<typeof startServer> | null = null;
+
 client.once('ready', (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  server = startServer(client);
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
@@ -73,11 +77,13 @@ client.on('messageCreate', handleMessageCreate);
 
 process.on('SIGINT', () => {
   console.log('\nShutting down...');
+  server?.close();
   client.destroy();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
+  server?.close();
   client.destroy();
   process.exit(0);
 });
