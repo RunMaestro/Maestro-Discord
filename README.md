@@ -146,11 +146,25 @@ Delete this file to reset all channel bindings.
 
 ## Discord bot permissions
 
-- Read Messages / View Channels
+Invite the bot with both `bot` and `applications.commands` scopes:
+
+```text
+https://discord.com/oauth2/authorize?client_id=<DISCORD_CLIENT_ID>&scope=bot+applications.commands&permissions=11280
+```
+
+This grants the following permissions:
+
+- View Channels
 - Send Messages
 - Manage Channels
-- Add Reactions
-- Read Message History
+
+Then enable **Message Content Intent** under Privileged Gateway Intents at:
+
+```text
+https://discord.com/developers/applications/<DISCORD_CLIENT_ID>/bot
+```
+
+Without this the bot will fail to connect with a "Used disallowed intents" error.
 
 ## Security
 

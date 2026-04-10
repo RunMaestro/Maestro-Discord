@@ -9,6 +9,12 @@ import {
 import { maestro } from '../services/maestro';
 import { channelDb, threadDb } from '../db';
 import { cleanupAgentFiles } from '../utils/attachments';
+import { config } from '../config';
+
+const MISSING_BOT_SCOPE =
+  '❌ The bot is not a member of this server. It was likely invited with only slash-command permissions.\n\n' +
+  'Re-invite with both `bot` and `applications.commands` scopes:\n' +
+  `https://discord.com/oauth2/authorize?client_id=${config.clientId}&scope=bot+applications.commands&permissions=11280`;
 
 export const data = new SlashCommandBuilder()
   .setName('agents')
@@ -118,7 +124,7 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
   const agentInput = interaction.options.getString('agent', true);
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.editReply('This command must be used in a server.');
+    await interaction.editReply(interaction.guildId ? MISSING_BOT_SCOPE : 'This command must be used in a server.');
     return;
   }
 
