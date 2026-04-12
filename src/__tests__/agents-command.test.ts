@@ -179,22 +179,23 @@ test('agents disconnect removes channel and schedules deletion', async () => {
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
-  mock.method(channelDb, 'remove', () => {});
+  const removeChannelMock = mock.method(channelDb, 'remove', () => {});
   mock.method(channelDb, 'listByAgentId', () => []);
-  mock.method(threadDb, 'removeByChannel', () => {});
+  const removeThreadsMock = mock.method(threadDb, 'removeByChannel', () => {});
   mock.method(threadDb, 'getByAgentId', () => []);
 
   const { maestro } = await import('../services/maestro');
-  mock.method(maestro, 'getAgentCwd', async () => '/home/proj');
+  // Return null so cleanupAgentFiles is never called (no real side effects)
+  mock.method(maestro, 'getAgentCwd', async () => null);
 
-  // Mock cleanupAgentFiles - it's imported at module level, so mock on the module
-  // Since we can't easily mock a named import, we'll verify via side effects
   const interaction = makeInteraction({
     options: { getSubcommand: () => 'disconnect' },
   });
 
   await execute(interaction);
 
+  assert.equal(removeChannelMock.mock.callCount(), 1);
+  assert.equal(removeThreadsMock.mock.callCount(), 1);
   const reply = interaction.reply.mock.calls[0].arguments[0];
   assert.ok(reply.content.includes('Disconnecting'));
   assert.ok(reply.content.includes('TestBot'));

@@ -55,7 +55,9 @@ Returns `503` with `"status":"not_ready"` if the bot is disconnected.
 | `200` | Success |
 | `400` | Missing/invalid fields or malformed JSON |
 | `404` | Agent not found in Maestro |
+| `405` | Method not allowed |
 | `413` | Request body exceeds 1 MB |
 | `415` | Wrong Content-Type (must be `application/json`) |
 | `429` | Rate limited by Discord after 3 retries |
+| `500` | Internal server error |
 | `503` | Bot not connected to Discord |
