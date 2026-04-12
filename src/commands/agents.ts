@@ -29,10 +29,12 @@ export const data = new SlashCommandBuilder()
           .setName('agent')
           .setDescription('Select an agent')
           .setRequired(true)
-          .setAutocomplete(true)
-      )
+          .setAutocomplete(true),
+      ),
   )
-  .addSubcommand((sub) => sub.setName('disconnect').setDescription('Remove this agent channel (deletes the channel)'))
+  .addSubcommand((sub) =>
+    sub.setName('disconnect').setDescription('Remove this agent channel (deletes the channel)'),
+  )
   .addSubcommand((sub) =>
     sub
       .setName('readonly')
@@ -42,8 +44,8 @@ export const data = new SlashCommandBuilder()
           .setName('mode')
           .setDescription('Turn read-only on or off')
           .setRequired(true)
-          .addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' })
-      )
+          .addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' }),
+      ),
   );
 
 export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
@@ -52,10 +54,10 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
   try {
     const agents = await maestro.listAgents();
     const filtered = agents.filter(
-      (a) => a.name.toLowerCase().includes(focused) || a.id.toLowerCase().includes(focused)
+      (a) => a.name.toLowerCase().includes(focused) || a.id.toLowerCase().includes(focused),
     );
     await interaction.respond(
-      filtered.slice(0, 25).map((a) => ({ name: `${a.name} (${a.toolType})`, value: a.id }))
+      filtered.slice(0, 25).map((a) => ({ name: `${a.name} (${a.toolType})`, value: a.id })),
     );
   } catch {
     await interaction.respond([]);
@@ -96,9 +98,7 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     return;
   }
 
-  const lines = agents.map(
-    (a) => `**${a.name}** · \`${a.id}\` · ${a.toolType}`
-  );
+  const lines = agents.map((a) => `**${a.name}** · \`${a.id}\` · ${a.toolType}`);
 
   // Build a single embed; Discord limits description to 4096 chars and
   // total embed content to 6000 chars per message.  With compact one-line
@@ -138,25 +138,27 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
       ? await interaction.client.guilds.fetch(interaction.guildId).catch(() => null)
       : null);
   if (!guild) {
-    await interaction.editReply(interaction.guildId ? MISSING_BOT_SCOPE : 'This command must be used in a server.');
+    await interaction.editReply(
+      interaction.guildId ? MISSING_BOT_SCOPE : 'This command must be used in a server.',
+    );
     return;
   }
 
   const agents = await maestro.listAgents();
   const agent = agents.find(
-    (a) => a.id === agentInput || a.id.startsWith(agentInput) || a.name === agentInput
+    (a) => a.id === agentInput || a.id.startsWith(agentInput) || a.name === agentInput,
   );
 
   if (!agent) {
     await interaction.editReply(
-      `❌ No agent found matching \`${agentInput}\`. Use \`/agents list\` to see available agents.`
+      `❌ No agent found matching \`${agentInput}\`. Use \`/agents list\` to see available agents.`,
     );
     return;
   }
 
   // Find or create "Maestro Agents" category
   let category = guild.channels.cache.find(
-    (c) => c.type === ChannelType.GuildCategory && c.name === 'Maestro Agents'
+    (c) => c.type === ChannelType.GuildCategory && c.name === 'Maestro Agents',
   );
   if (!category) {
     category = await guild.channels.create({
@@ -177,13 +179,13 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
 
   await interaction.editReply(
     `✅ Created <#${channel.id}> for agent **${agent.name}**.\n` +
-      `Type your messages there to chat with the agent.`
+      `Type your messages there to chat with the agent.`,
   );
 
   await channel.send(
     `**${agent.name}** is ready.\n` +
       `Type any message here and it will be sent to this agent.\n` +
-      `-# Agent: \`${agent.id}\` • ${agent.toolType} • \`${agent.cwd}\``
+      `-# Agent: \`${agent.id}\` • ${agent.toolType} • \`${agent.cwd}\``,
   );
 }
 
@@ -203,7 +205,7 @@ async function handleReadonly(interaction: ChatInputCommandInteraction): Promise
     .setDescription(
       readOnly
         ? `📖 **${channelInfo.agent_name}** is now in **read-only** mode. The agent cannot modify files.`
-        : `✏️ **${channelInfo.agent_name}** is back to **read-write** mode.`
+        : `✏️ **${channelInfo.agent_name}** is back to **read-write** mode.`,
     );
 
   await interaction.reply({ embeds: [embed] });
@@ -216,17 +218,20 @@ async function handleDisconnect(interaction: ChatInputCommandInteraction): Promi
     return;
   }
 
-  await interaction.reply({ content: `Disconnecting **${channelInfo.agent_name}**...`, ephemeral: true });
+  await interaction.reply({
+    content: `Disconnecting **${channelInfo.agent_name}**...`,
+    ephemeral: true,
+  });
 
   // Clean up downloaded files if this is the last channel for this agent
   // (also consider threads bound to other channels for the same agent)
   const agentId = channelInfo.agent_id;
-  const otherChannels = channelDb.listByAgentId(agentId).filter(
-    (c) => c.channel_id !== interaction.channelId,
-  );
-  const otherThreads = threadDb.getByAgentId(agentId).filter(
-    (t) => t.channel_id !== interaction.channelId,
-  );
+  const otherChannels = channelDb
+    .listByAgentId(agentId)
+    .filter((c) => c.channel_id !== interaction.channelId);
+  const otherThreads = threadDb
+    .getByAgentId(agentId)
+    .filter((t) => t.channel_id !== interaction.channelId);
 
   if (otherChannels.length === 0 && otherThreads.length === 0) {
     try {
@@ -239,7 +244,9 @@ async function handleDisconnect(interaction: ChatInputCommandInteraction): Promi
       console.warn(`[disconnect] Failed to clean up files for agent ${agentId}:`, err);
     }
   } else {
-    console.log(`[disconnect] Skipping file cleanup for agent ${agentId} — ${otherChannels.length} other channel(s) and ${otherThreads.length} other thread(s) still active`);
+    console.log(
+      `[disconnect] Skipping file cleanup for agent ${agentId} — ${otherChannels.length} other channel(s) and ${otherThreads.length} other thread(s) still active`,
+    );
   }
 
   // Remove channel and its threads from DB

@@ -32,7 +32,11 @@ function createDeps(enqueue: (...args: any[]) => void) {
 
 test('handleMessageCreate ignores bot messages', async () => {
   let enqueued = 0;
-  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+  const handler = createMessageCreateHandler(
+    createDeps(() => {
+      enqueued += 1;
+    }),
+  );
 
   await handler(makeMessage({ author: { bot: true } }) as any);
   assert.equal(enqueued, 0);
@@ -40,7 +44,11 @@ test('handleMessageCreate ignores bot messages', async () => {
 
 test('handleMessageCreate ignores DMs', async () => {
   let enqueued = 0;
-  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+  const handler = createMessageCreateHandler(
+    createDeps(() => {
+      enqueued += 1;
+    }),
+  );
 
   await handler(makeMessage({ guild: null }) as any);
   assert.equal(enqueued, 0);
@@ -48,7 +56,11 @@ test('handleMessageCreate ignores DMs', async () => {
 
 test('handleMessageCreate ignores messages with no text and no attachments', async () => {
   let enqueued = 0;
-  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+  const handler = createMessageCreateHandler(
+    createDeps(() => {
+      enqueued += 1;
+    }),
+  );
 
   await handler(makeMessage({ content: '   ', attachments: { size: 0, values: () => [] } }) as any);
   assert.equal(enqueued, 0);
@@ -56,30 +68,49 @@ test('handleMessageCreate ignores messages with no text and no attachments', asy
 
 test('handleMessageCreate allows attachment-only messages (no text)', async () => {
   let enqueued = 0;
-  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+  const handler = createMessageCreateHandler(
+    createDeps(() => {
+      enqueued += 1;
+    }),
+  );
 
-  await handler(makeMessage({
-    content: '',
-    attachments: { size: 1, values: () => [{ url: 'https://example.com/file.png', name: 'file.png' }] },
-  }) as any);
+  await handler(
+    makeMessage({
+      content: '',
+      attachments: {
+        size: 1,
+        values: () => [{ url: 'https://example.com/file.png', name: 'file.png' }],
+      },
+    }) as any,
+  );
   assert.equal(enqueued, 1);
 });
 
 test('handleMessageCreate ignores non-thread channels', async () => {
   let enqueued = 0;
-  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+  const handler = createMessageCreateHandler(
+    createDeps(() => {
+      enqueued += 1;
+    }),
+  );
 
   await handler(
     makeMessage({
-      channel: { id: 'channel-1', isThread: () => false, threads: { create: async () => undefined } },
-    }) as any
+      channel: {
+        id: 'channel-1',
+        isThread: () => false,
+        threads: { create: async () => undefined },
+      },
+    }) as any,
   );
   assert.equal(enqueued, 0);
 });
 
 test('handleMessageCreate ignores unregistered threads', async () => {
   let enqueued = 0;
-  const deps = createDeps(() => { enqueued += 1; });
+  const deps = createDeps(() => {
+    enqueued += 1;
+  });
   deps.threadDb.get = () => undefined;
   const handler = createMessageCreateHandler(deps);
 
@@ -89,7 +120,11 @@ test('handleMessageCreate ignores unregistered threads', async () => {
 
 test('handleMessageCreate enqueues messages for registered threads', async () => {
   let enqueued = 0;
-  const handler = createMessageCreateHandler(createDeps(() => { enqueued += 1; }));
+  const handler = createMessageCreateHandler(
+    createDeps(() => {
+      enqueued += 1;
+    }),
+  );
 
   await handler(makeMessage() as any);
   assert.equal(enqueued, 1);
@@ -97,21 +132,29 @@ test('handleMessageCreate enqueues messages for registered threads', async () =>
 
 test('handleMessageCreate enqueues messages for registered threads from the owner', async () => {
   let enqueued = 0;
-  const deps = createDeps(() => { enqueued += 1; });
+  const deps = createDeps(() => {
+    enqueued += 1;
+  });
   deps.threadDb.get = () => ({ thread_id: 'thread-1', owner_user_id: 'user-1' }) as any;
   const handler = createMessageCreateHandler(deps);
 
-  await handler(makeMessage({ author: { bot: false, id: 'user-1', username: 'owner-user' } }) as any);
+  await handler(
+    makeMessage({ author: { bot: false, id: 'user-1', username: 'owner-user' } }) as any,
+  );
   assert.equal(enqueued, 1);
 });
 
 test('handleMessageCreate silently ignores registered thread messages from non-owner', async () => {
   let enqueued = 0;
-  const deps = createDeps(() => { enqueued += 1; });
+  const deps = createDeps(() => {
+    enqueued += 1;
+  });
   deps.threadDb.get = () => ({ thread_id: 'thread-1', owner_user_id: 'owner-1' }) as any;
   const handler = createMessageCreateHandler(deps);
 
-  await handler(makeMessage({ author: { bot: false, id: 'user-2', username: 'other-user' } }) as any);
+  await handler(
+    makeMessage({ author: { bot: false, id: 'user-2', username: 'other-user' } }) as any,
+  );
   assert.equal(enqueued, 0);
 });
 
@@ -119,7 +162,9 @@ test('handleMessageCreate creates and registers a thread for bot mentions in reg
   let enqueued = 0;
   const registerCalls: unknown[][] = [];
   const sentMessages: string[] = [];
-  const deps = createDeps(() => { enqueued += 1; });
+  const deps = createDeps(() => {
+    enqueued += 1;
+  });
   deps.threadDb.register = (...args: unknown[]) => {
     registerCalls.push(args);
   };
@@ -139,13 +184,17 @@ test('handleMessageCreate creates and registers a thread for bot mentions in reg
               send: async (msg: string | { content?: string; files?: string[] }) => {
                 const text = typeof msg === 'string' ? msg : (msg.content ?? '');
                 sentMessages.push(text);
-                return { id: 'msg-forwarded', content: text, attachments: { size: 0, values: () => [] } };
+                return {
+                  id: 'msg-forwarded',
+                  content: text,
+                  attachments: { size: 0, values: () => [] },
+                };
               },
             };
           },
         },
       },
-    }) as any
+    }) as any,
   );
 
   assert.equal(enqueued, 1);
@@ -178,7 +227,7 @@ test('handleMessageCreate creates and registers a thread when mention metadata i
           }),
         },
       },
-    }) as any
+    }) as any,
   );
 
   assert.deepEqual(registerCalls, [['thread-new-2', 'channel-1', 'agent-1', 'user-42']]);
@@ -187,7 +236,10 @@ test('handleMessageCreate creates and registers a thread when mention metadata i
 test('handleMessageCreate forwards attachments as AttachmentPayload objects in mention-triggered threads', async () => {
   let enqueued = 0;
   let enqueuedMessage: any = null;
-  const deps = createDeps((msg: any) => { enqueued += 1; enqueuedMessage = msg; });
+  const deps = createDeps((msg: any) => {
+    enqueued += 1;
+    enqueuedMessage = msg;
+  });
   deps.threadDb.register = () => undefined;
 
   const handler = createMessageCreateHandler(deps as any);
@@ -196,9 +248,7 @@ test('handleMessageCreate forwards attachments as AttachmentPayload objects in m
       content: 'check this <@bot-1>',
       attachments: {
         size: 1,
-        values: () => [
-          { url: 'https://cdn.discord.com/file.png', name: 'file.png', size: 500 },
-        ],
+        values: () => [{ url: 'https://cdn.discord.com/file.png', name: 'file.png', size: 500 }],
       },
       channel: {
         id: 'channel-1',
@@ -224,7 +274,11 @@ test('handleMessageCreate forwards attachments as AttachmentPayload objects in m
                 attachments: {
                   size: 1,
                   values: () => [
-                    { url: 'https://cdn.discord.com/reupload/file.png', name: 'file.png', size: 500 },
+                    {
+                      url: 'https://cdn.discord.com/reupload/file.png',
+                      name: 'file.png',
+                      size: 500,
+                    },
                   ],
                 },
               };
@@ -232,7 +286,7 @@ test('handleMessageCreate forwards attachments as AttachmentPayload objects in m
           }),
         },
       },
-    }) as any
+    }) as any,
   );
 
   assert.equal(enqueued, 1);
@@ -259,7 +313,7 @@ test('handleMessageCreate ignores non-thread channel messages without bot mentio
           },
         },
       },
-    }) as any
+    }) as any,
   );
 
   assert.equal(created, 0);

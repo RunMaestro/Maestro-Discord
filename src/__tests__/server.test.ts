@@ -37,7 +37,15 @@ function makeClient(overrides: Record<string, unknown> = {}) {
 function makeDeps(overrides: Partial<ServerDeps> = {}): ServerDeps {
   return {
     channelDb: {
-      getByAgentId: () => ({ channel_id: 'ch-1', guild_id: 'g-1', agent_id: 'a-1', agent_name: 'Test', session_id: null, read_only: 0, created_at: 0 }),
+      getByAgentId: () => ({
+        channel_id: 'ch-1',
+        guild_id: 'g-1',
+        agent_id: 'a-1',
+        agent_name: 'Test',
+        session_id: null,
+        read_only: 0,
+        created_at: 0,
+      }),
       register: () => undefined,
     },
     maestro: { listAgents: async () => [] },
@@ -48,7 +56,10 @@ function makeDeps(overrides: Partial<ServerDeps> = {}): ServerDeps {
   };
 }
 
-function request(server: http.Server, options: { method: string; path: string; body?: object; contentType?: string }): Promise<{ status: number; body: any }> {
+function request(
+  server: http.Server,
+  options: { method: string; path: string; body?: object; contentType?: string },
+): Promise<{ status: number; body: any }> {
   return new Promise((resolve, reject) => {
     const addr = server.address() as { port: number };
     const payload = options.body ? JSON.stringify(options.body) : undefined;
@@ -57,7 +68,13 @@ function request(server: http.Server, options: { method: string; path: string; b
     if (ct) headers['Content-Type'] = ct;
     if (payload) headers['Content-Length'] = Buffer.byteLength(payload);
     const req = http.request(
-      { hostname: '127.0.0.1', port: addr.port, path: options.path, method: options.method, headers },
+      {
+        hostname: '127.0.0.1',
+        port: addr.port,
+        path: options.path,
+        method: options.method,
+        headers,
+      },
       (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
@@ -148,7 +165,11 @@ test('GET /api/send returns 405', async () => {
 test('POST /api/send returns 503 when client is not ready', async () => {
   const server = await startTestServer(makeClient({ isReady: () => false }), makeDeps());
   try {
-    const res = await request(server, { method: 'POST', path: '/api/send', body: { agentId: 'a-1', message: 'hi' } });
+    const res = await request(server, {
+      method: 'POST',
+      path: '/api/send',
+      body: { agentId: 'a-1', message: 'hi' },
+    });
     assert.equal(res.status, 503);
     assert.equal(res.body.error, 'Bot is not connected to Discord');
   } finally {
@@ -159,7 +180,11 @@ test('POST /api/send returns 503 when client is not ready', async () => {
 test('POST /api/send returns 400 for missing fields', async () => {
   const server = await startTestServer(makeClient(), makeDeps());
   try {
-    const res = await request(server, { method: 'POST', path: '/api/send', body: { agentId: 'a-1' } });
+    const res = await request(server, {
+      method: 'POST',
+      path: '/api/send',
+      body: { agentId: 'a-1' },
+    });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /required/);
   } finally {
@@ -173,13 +198,19 @@ test('POST /api/send returns 200 on success', async () => {
     channels: {
       fetch: async () => ({
         isSendable: () => true,
-        send: async (msg: string) => { sentMessages.push(msg); },
+        send: async (msg: string) => {
+          sentMessages.push(msg);
+        },
       }),
     },
   });
   const server = await startTestServer(client, makeDeps());
   try {
-    const res = await request(server, { method: 'POST', path: '/api/send', body: { agentId: 'a-1', message: 'hello' } });
+    const res = await request(server, {
+      method: 'POST',
+      path: '/api/send',
+      body: { agentId: 'a-1', message: 'hello' },
+    });
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
     assert.equal(res.body.channelId, 'ch-1');
@@ -195,14 +226,20 @@ test('POST /api/send prepends mention when mention=true and mentionUserId is set
     channels: {
       fetch: async () => ({
         isSendable: () => true,
-        send: async (msg: string) => { sentMessages.push(msg); },
+        send: async (msg: string) => {
+          sentMessages.push(msg);
+        },
       }),
     },
   });
   const deps = makeDeps({ config: { guildId: 'g-1', apiPort: 0, mentionUserId: '999' } });
   const server = await startTestServer(client, deps);
   try {
-    const res = await request(server, { method: 'POST', path: '/api/send', body: { agentId: 'a-1', message: 'done', mention: true } });
+    const res = await request(server, {
+      method: 'POST',
+      path: '/api/send',
+      body: { agentId: 'a-1', message: 'done', mention: true },
+    });
     assert.equal(res.status, 200);
     assert.deepEqual(sentMessages, ['<@999> done']);
   } finally {
@@ -216,13 +253,19 @@ test('POST /api/send does not mention when mentionUserId is empty', async () => 
     channels: {
       fetch: async () => ({
         isSendable: () => true,
-        send: async (msg: string) => { sentMessages.push(msg); },
+        send: async (msg: string) => {
+          sentMessages.push(msg);
+        },
       }),
     },
   });
   const server = await startTestServer(client, makeDeps());
   try {
-    const res = await request(server, { method: 'POST', path: '/api/send', body: { agentId: 'a-1', message: 'done', mention: true } });
+    const res = await request(server, {
+      method: 'POST',
+      path: '/api/send',
+      body: { agentId: 'a-1', message: 'done', mention: true },
+    });
     assert.equal(res.status, 200);
     assert.deepEqual(sentMessages, ['done']);
   } finally {
@@ -240,7 +283,11 @@ test('POST /api/send returns 404 for unknown agent', async () => {
   });
   const server = await startTestServer(makeClient(), deps);
   try {
-    const res = await request(server, { method: 'POST', path: '/api/send', body: { agentId: 'missing', message: 'hi' } });
+    const res = await request(server, {
+      method: 'POST',
+      path: '/api/send',
+      body: { agentId: 'missing', message: 'hi' },
+    });
     assert.equal(res.status, 404);
     assert.match(res.body.error, /Agent not found/);
   } finally {
@@ -254,7 +301,13 @@ test('POST /api/send returns 415 for wrong content type', async () => {
     const addr = server.address() as { port: number };
     const res = await new Promise<{ status: number; body: any }>((resolve, reject) => {
       const req = http.request(
-        { hostname: '127.0.0.1', port: addr.port, path: '/api/send', method: 'POST', headers: { 'Content-Type': 'text/plain' } },
+        {
+          hostname: '127.0.0.1',
+          port: addr.port,
+          path: '/api/send',
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+        },
         (res) => {
           let data = '';
           res.on('data', (chunk) => (data += chunk));
@@ -275,7 +328,12 @@ test('POST /api/send returns 415 for wrong content type', async () => {
 
 test('parseBody rejects invalid JSON', async () => {
   const { Readable } = await import('node:stream');
-  const req = new Readable({ read() { this.push('not json'); this.push(null); } }) as any;
+  const req = new Readable({
+    read() {
+      this.push('not json');
+      this.push(null);
+    },
+  }) as any;
   req.headers = {};
   req.destroy = () => {};
   await assert.rejects(mod.parseBody!(req), /Invalid JSON/);

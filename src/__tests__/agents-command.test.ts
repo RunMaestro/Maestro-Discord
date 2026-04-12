@@ -302,7 +302,9 @@ test('autocomplete filters agents by name', async () => {
   const responses: unknown[] = [];
   const interaction = {
     options: { getFocused: () => 'alpha' },
-    respond: mock.fn(async (items: unknown) => { responses.push(items); }),
+    respond: mock.fn(async (items: unknown) => {
+      responses.push(items);
+    }),
   } as any;
 
   await autocomplete(interaction);
@@ -316,7 +318,9 @@ test('autocomplete filters agents by name', async () => {
 
 test('autocomplete returns empty on error', async () => {
   const { maestro } = await import('../services/maestro');
-  mock.method(maestro, 'listAgents', async () => { throw new Error('CLI fail'); });
+  mock.method(maestro, 'listAgents', async () => {
+    throw new Error('CLI fail');
+  });
 
   const interaction = {
     options: { getFocused: () => '' },

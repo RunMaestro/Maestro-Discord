@@ -15,10 +15,18 @@ const createdThreads: string[] = [];
 
 afterEach(() => {
   for (const id of createdThreads) {
-    try { threadDb.remove(id); } catch { /* ignore */ }
+    try {
+      threadDb.remove(id);
+    } catch {
+      /* ignore */
+    }
   }
   for (const id of createdChannels) {
-    try { channelDb.remove(id); } catch { /* ignore */ }
+    try {
+      channelDb.remove(id);
+    } catch {
+      /* ignore */
+    }
   }
   createdChannels.length = 0;
   createdThreads.length = 0;

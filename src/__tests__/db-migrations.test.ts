@@ -19,9 +19,9 @@ test('ensureOwnerUserIdColumn adds owner_user_id and is safe to rerun', () => {
   ensureOwnerUserIdColumn(database);
   ensureOwnerUserIdColumn(database);
 
-  const columns = database
-    .prepare('PRAGMA table_info(agent_threads)')
-    .all() as Array<{ name: string }>;
+  const columns = database.prepare('PRAGMA table_info(agent_threads)').all() as Array<{
+    name: string;
+  }>;
 
   assert.ok(columns.some((column) => column.name === 'owner_user_id'));
 });

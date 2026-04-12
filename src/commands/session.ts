@@ -16,11 +16,11 @@ export const data = new SlashCommandBuilder()
       .setName('new')
       .setDescription('Create a new session thread for this agent')
       .addStringOption((opt) =>
-        opt.setName('name').setDescription('Name for this session thread').setRequired(false)
-      )
+        opt.setName('name').setDescription('Name for this session thread').setRequired(false),
+      ),
   )
   .addSubcommand((sub) =>
-    sub.setName('list').setDescription('List all session threads for this agent')
+    sub.setName('list').setDescription('List all session threads for this agent'),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -73,11 +73,11 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
   threadDb.register(thread.id, interaction.channelId, channelInfo.agent_id, interaction.user.id);
 
   await thread.send(
-    `🤖 **${channelInfo.agent_name}** — ready for a new session.\nType your first message to begin. This thread is linked to a dedicated Maestro session.\nOnly <@${interaction.user.id}> can interact with the agent in this thread.`
+    `🤖 **${channelInfo.agent_name}** — ready for a new session.\nType your first message to begin. This thread is linked to a dedicated Maestro session.\nOnly <@${interaction.user.id}> can interact with the agent in this thread.`,
   );
 
   await interaction.editReply(
-    `🧵 Session thread created: <#${thread.id}>\nChat with **${channelInfo.agent_name}** inside that thread.`
+    `🧵 Session thread created: <#${thread.id}>\nChat with **${channelInfo.agent_name}** inside that thread.`,
   );
 }
 
@@ -102,15 +102,10 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     // fall through with empty list
   }
 
-  const sessionMap = new Map<string, MaestroSession>(
-    maestroSessions.map((s) => [s.sessionId, s])
-  );
+  const sessionMap = new Map<string, MaestroSession>(maestroSessions.map((s) => [s.sessionId, s]));
 
   const lines = dbThreads.map((t) => {
     const maestroInfo = sessionMap.get(t.session_id ?? '');
-    const threadName =
-      (interaction.guild?.channels.cache.get(t.thread_id) as { name?: string } | undefined)
-        ?.name ?? 'Unknown thread';
     const shortId = t.session_id ? t.session_id.slice(0, 8) : 'no session yet';
     const stats = maestroInfo
       ? `${maestroInfo.messageCount} msgs · $${maestroInfo.costUsd.toFixed(4)} · ${new Date(maestroInfo.modifiedAt).toLocaleDateString()}`

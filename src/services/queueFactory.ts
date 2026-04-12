@@ -7,7 +7,12 @@ interface QueueEntry {
 export type QueueDeps = {
   maestro: {
     getAgentCwd: (agentId: string) => Promise<string | null>;
-    send: (agentId: string, message: string, sessionId?: string, readOnly?: boolean) => Promise<{
+    send: (
+      agentId: string,
+      message: string,
+      sessionId?: string,
+      readOnly?: boolean,
+    ) => Promise<{
       success: boolean;
       response: string | null;
       error?: string;
@@ -21,16 +26,35 @@ export type QueueDeps = {
     }>;
   };
   channelDb: {
-    get: (channelId: string) => { channel_id: string; agent_id: string; session_id?: string | null; read_only?: number | boolean } | undefined;
+    get: (channelId: string) =>
+      | {
+          channel_id: string;
+          agent_id: string;
+          session_id?: string | null;
+          read_only?: number | boolean;
+        }
+      | undefined;
     updateSession: (channelId: string, sessionId: string) => void;
   };
   threadDb: {
-    get: (threadId: string) => { thread_id: string; channel_id: string; agent_id: string; session_id?: string | null; owner_user_id?: string | null } | undefined;
+    get: (threadId: string) =>
+      | {
+          thread_id: string;
+          channel_id: string;
+          agent_id: string;
+          session_id?: string | null;
+          owner_user_id?: string | null;
+        }
+      | undefined;
     updateSession: (threadId: string, sessionId: string) => void;
   };
   splitMessage: (text: string) => string[];
-  downloadAttachments: (attachments: Message['attachments'], agentCwd: string) => Promise<{ downloaded: { originalName: string; savedPath: string }[]; failed: string[] }>;
+  downloadAttachments: (
+    attachments: Message['attachments'],
+    agentCwd: string,
+  ) => Promise<{ downloaded: { originalName: string; savedPath: string }[]; failed: string[] }>;
   formatAttachmentRefs: (files: { originalName: string; savedPath: string }[]) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: { error: (...args: any[]) => any };
 };
 
@@ -70,7 +94,9 @@ export function createQueue(deps: QueueDeps) {
     }
 
     const agentId = threadInfo ? threadInfo.agent_id : channelInfo.agent_id;
-    const sessionId = threadInfo ? (threadInfo.session_id ?? undefined) : (channelInfo.session_id ?? undefined);
+    const sessionId = threadInfo
+      ? (threadInfo.session_id ?? undefined)
+      : (channelInfo.session_id ?? undefined);
 
     const channel = message.channel as TextChannel | ThreadChannel;
 
@@ -96,14 +122,19 @@ export function createQueue(deps: QueueDeps) {
             const result = await deps.downloadAttachments(message.attachments, agentCwd);
             attachmentRefs = deps.formatAttachmentRefs(result.downloaded);
             if (result.failed.length > 0) {
-              await channel.send(`⚠️ Failed to download: ${result.failed.join(', ')}. Sending message without those files.`);
+              await channel.send(
+                `⚠️ Failed to download: ${result.failed.join(', ')}. Sending message without those files.`,
+              );
             }
           } else {
             await channel.send('⚠️ Could not resolve agent working directory for file downloads.');
           }
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
-          void deps.logger.error('queue:attachment-download', `agent=${agentId} channel=${channelId} error=${errMsg}`);
+          void deps.logger.error(
+            'queue:attachment-download',
+            `agent=${agentId} channel=${channelId} error=${errMsg}`,
+          );
           await channel.send('⚠️ Failed to download attachments. Sending message without them.');
         }
       }
@@ -131,8 +162,13 @@ export function createQueue(deps: QueueDeps) {
 
       if (!result.success || !result.response) {
         const reason = result.error ?? 'The agent could not complete this request.';
-        const hint = readOnly ? '\n-# The agent is in **read-only** mode and cannot modify files.' : '';
-        void deps.logger.error('queue:agent-failure', `agent=${agentId} session=${sessionId ?? 'new'} channel=${channelId} reason=${reason}`);
+        const hint = readOnly
+          ? '\n-# The agent is in **read-only** mode and cannot modify files.'
+          : '';
+        void deps.logger.error(
+          'queue:agent-failure',
+          `agent=${agentId} session=${sessionId ?? 'new'} channel=${channelId} reason=${reason}`,
+        );
         await channel.send(`⚠️ ${reason}${hint}`);
       } else {
         const parts = deps.splitMessage(result.response);
@@ -145,17 +181,21 @@ export function createQueue(deps: QueueDeps) {
       const ctx = (result.usage?.contextUsagePercent ?? 0).toFixed(1);
       const tokens = (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0);
       await channel.send(
-        `-# 💬 ${tokens} tokens • $${cost} • ${ctx}% context${readOnly ? ' • 📖 read-only' : ''}`
+        `-# 💬 ${tokens} tokens • $${cost} • ${ctx}% context${readOnly ? ' • 📖 read-only' : ''}`,
       );
-
     } catch (err) {
       clearInterval(typingInterval);
       try {
         await reaction?.remove();
-      } catch {}
+      } catch {
+        /* reaction cleanup is best-effort */
+      }
 
       const errMsg = err instanceof Error ? err.message : String(err);
-      void deps.logger.error('queue:send-error', `agent=${agentId} session=${sessionId ?? 'new'} channel=${channelId} error=${errMsg}`);
+      void deps.logger.error(
+        'queue:send-error',
+        `agent=${agentId} session=${sessionId ?? 'new'} channel=${channelId} error=${errMsg}`,
+      );
       await channel.send(`❌ Failed to get response from agent:\n\`\`\`\n${errMsg}\n\`\`\``);
     }
 

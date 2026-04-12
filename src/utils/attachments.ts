@@ -29,7 +29,7 @@ export async function downloadAttachments(
     await mkdir(targetDir, { recursive: true });
   } catch (err) {
     console.warn(`[attachments] Failed to create directory "${targetDir}":`, err);
-    return { downloaded: [], failed: [...attachments.values()].map(a => a.name) };
+    return { downloaded: [], failed: [...attachments.values()].map((a) => a.name) };
   }
 
   const downloaded: DownloadedFile[] = [];

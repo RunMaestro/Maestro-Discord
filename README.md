@@ -76,15 +76,15 @@ node --test --experimental-test-coverage --import tsx
 
 ## Slash commands
 
-| Command | Description |
-|---|---|
-| `/health` | Verify Maestro CLI is installed and working |
-| `/agents list` | Show all available agents |
-| `/agents new <agent-id>` | Create a dedicated channel for an agent |
-| `/agents disconnect` | (Run inside an agent channel) Remove and delete the channel |
-| `/agents readonly on\|off` | Toggle read-only mode for the current agent channel |
-| `/session new` | Create a new owner-bound thread for the current agent channel |
-| `/session list` | List session threads for the current agent channel |
+| Command                    | Description                                                   |
+| -------------------------- | ------------------------------------------------------------- |
+| `/health`                  | Verify Maestro CLI is installed and working                   |
+| `/agents list`             | Show all available agents                                     |
+| `/agents new <agent-id>`   | Create a dedicated channel for an agent                       |
+| `/agents disconnect`       | (Run inside an agent channel) Remove and delete the channel   |
+| `/agents readonly on\|off` | Toggle read-only mode for the current agent channel           |
+| `/session new`             | Create a new owner-bound thread for the current agent channel |
+| `/session list`            | List session threads for the current agent channel            |
 
 ## How it works
 

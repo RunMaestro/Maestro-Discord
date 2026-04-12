@@ -30,15 +30,16 @@ client.once('ready', (c) => {
 
 client.on('interactionCreate', async (interaction: Interaction) => {
   const isUnauthorized =
-    config.allowedUserIds.length > 0 &&
-    !config.allowedUserIds.includes(interaction.user.id);
+    config.allowedUserIds.length > 0 && !config.allowedUserIds.includes(interaction.user.id);
 
   if (interaction.isAutocomplete()) {
     if (isUnauthorized) {
       await interaction.respond([]);
       return;
     }
-    const cmd = commands.get(interaction.commandName) as { autocomplete?: (i: typeof interaction) => Promise<void> };
+    const cmd = commands.get(interaction.commandName) as {
+      autocomplete?: (i: typeof interaction) => Promise<void>;
+    };
     if (cmd?.autocomplete) {
       try {
         await cmd.autocomplete(interaction);

@@ -24,16 +24,16 @@ Each thread is bound to the user who created it (via mention or `/session new`).
 
 ## Project layout
 
-| Path | Purpose |
-|------|---------|
-| `src/config.ts` | Environment variable loading |
-| `src/db/index.ts` | SQLite channel registry (`agent_channels` table) |
-| `src/services/maestro.ts` | `maestro-cli` wrapper (listAgents, listSessions, send) |
-| `src/services/queue.ts` | Per-channel FIFO message queue |
-| `src/services/logger.ts` | Logging service |
-| `src/server.ts` | Internal HTTP API server |
-| `src/commands/` | Slash command handlers |
-| `src/handlers/messageCreate.ts` | Discord message listener |
-| `src/utils/splitMessage.ts` | Splits long messages for Discord's 2000-char limit |
-| `src/deploy-commands.ts` | Registers slash commands with Discord API |
-| `bin/maestro-discord.ts` | CLI tool for agent-to-Discord messaging |
+| Path                            | Purpose                                                |
+| ------------------------------- | ------------------------------------------------------ |
+| `src/config.ts`                 | Environment variable loading                           |
+| `src/db/index.ts`               | SQLite channel registry (`agent_channels` table)       |
+| `src/services/maestro.ts`       | `maestro-cli` wrapper (listAgents, listSessions, send) |
+| `src/services/queue.ts`         | Per-channel FIFO message queue                         |
+| `src/services/logger.ts`        | Logging service                                        |
+| `src/server.ts`                 | Internal HTTP API server                               |
+| `src/commands/`                 | Slash command handlers                                 |
+| `src/handlers/messageCreate.ts` | Discord message listener                               |
+| `src/utils/splitMessage.ts`     | Splits long messages for Discord's 2000-char limit     |
+| `src/deploy-commands.ts`        | Registers slash commands with Discord API              |
+| `bin/maestro-discord.ts`        | CLI tool for agent-to-Discord messaging                |

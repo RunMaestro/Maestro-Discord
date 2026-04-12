@@ -12,12 +12,13 @@ import {
   MAX_FILE_SIZE,
   FILES_DIR,
   DownloadedFile,
-  DownloadResult,
 } from '../utils/attachments';
 
 // --- Helpers ---
 
-function makeAttachment(overrides: Partial<Attachment> & { name: string; url: string; size: number }): Attachment {
+function makeAttachment(
+  overrides: Partial<Attachment> & { name: string; url: string; size: number },
+): Attachment {
   return {
     contentType: 'application/octet-stream',
     ...overrides,
@@ -37,7 +38,8 @@ function okResponse(body: string | Buffer): Response {
   return {
     ok: true,
     status: 200,
-    arrayBuffer: () => Promise.resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)),
+    arrayBuffer: () =>
+      Promise.resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)),
   } as unknown as Response;
 }
 
@@ -71,7 +73,9 @@ test('downloadAttachments creates .maestro/discord-files/ directory', async () =
   globalThis.fetch = () => Promise.resolve(okResponse('content'));
 
   const result = await downloadAttachments(
-    makeCollection(makeAttachment({ name: 'test.txt', url: 'https://cdn.example.com/test.txt', size: 100 })),
+    makeCollection(
+      makeAttachment({ name: 'test.txt', url: 'https://cdn.example.com/test.txt', size: 100 }),
+    ),
     tmpDir,
   );
 
@@ -85,7 +89,9 @@ test('downloadAttachments saves files with UUID-prefixed names', async () => {
   globalThis.fetch = () => Promise.resolve(okResponse('file content'));
 
   const { downloaded, failed } = await downloadAttachments(
-    makeCollection(makeAttachment({ name: 'photo.png', url: 'https://cdn.example.com/photo.png', size: 500 })),
+    makeCollection(
+      makeAttachment({ name: 'photo.png', url: 'https://cdn.example.com/photo.png', size: 500 }),
+    ),
     tmpDir,
   );
 
@@ -109,7 +115,13 @@ test('downloadAttachments skips oversized attachments and reports them as failed
   };
 
   const { downloaded, failed } = await downloadAttachments(
-    makeCollection(makeAttachment({ name: 'huge.bin', url: 'https://cdn.example.com/huge.bin', size: MAX_FILE_SIZE + 1 })),
+    makeCollection(
+      makeAttachment({
+        name: 'huge.bin',
+        url: 'https://cdn.example.com/huge.bin',
+        size: MAX_FILE_SIZE + 1,
+      }),
+    ),
     tmpDir,
   );
 
@@ -127,7 +139,11 @@ test('downloadAttachments skips failed fetches, reports them, and continues', as
 
   const { downloaded, failed } = await downloadAttachments(
     makeCollection(
-      makeAttachment({ name: 'missing.txt', url: 'https://cdn.example.com/missing.txt', size: 100 }),
+      makeAttachment({
+        name: 'missing.txt',
+        url: 'https://cdn.example.com/missing.txt',
+        size: 100,
+      }),
       makeAttachment({ name: 'ok.txt', url: 'https://cdn.example.com/ok.txt', size: 100 }),
     ),
     tmpDir,
@@ -149,7 +165,10 @@ test('formatAttachmentRefs produces correct format', () => {
     { originalName: 'b.png', savedPath: '/home/agent/files/456-b.png' },
   ];
   const result = formatAttachmentRefs(files);
-  assert.equal(result, '[Attached: /home/agent/files/123-a.txt]\n[Attached: /home/agent/files/456-b.png]');
+  assert.equal(
+    result,
+    '[Attached: /home/agent/files/123-a.txt]\n[Attached: /home/agent/files/456-b.png]',
+  );
 });
 
 test('formatAttachmentRefs returns empty string for empty array', () => {

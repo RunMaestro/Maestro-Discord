@@ -64,7 +64,14 @@ export interface MaestroPlaybookDetail extends MaestroPlaybook {
 }
 
 export interface PlaybookEvent {
-  type: 'start' | 'document_start' | 'task_start' | 'task_complete' | 'document_complete' | 'loop_complete' | 'complete';
+  type:
+    | 'start'
+    | 'document_start'
+    | 'task_start'
+    | 'task_complete'
+    | 'document_complete'
+    | 'loop_complete'
+    | 'complete';
   timestamp: number;
   success?: boolean;
   summary?: string;
@@ -92,7 +99,13 @@ async function run(args: string[], opts: RunOptions = {}): Promise<string> {
     })) as { stdout: string; stderr: string };
     return stdout.trim();
   } catch (err: unknown) {
-    const e = err as { message?: string; stderr?: string; stdout?: string; code?: string | number; killed?: boolean };
+    const e = err as {
+      message?: string;
+      stderr?: string;
+      stdout?: string;
+      code?: string | number;
+      killed?: boolean;
+    };
     const parts: string[] = [];
     if (e.killed) parts.push('process killed (timeout?)');
     if (e.code) parts.push(`exit code: ${e.code}`);
@@ -101,7 +114,7 @@ async function run(args: string[], opts: RunOptions = {}): Promise<string> {
     if (parts.length === 0) parts.push(e.message || String(err));
     const detail = parts.join(' | ');
     console.error(`[maestro-cli ${args[0]}] ${detail}`);
-    throw new Error(`maestro-cli ${args[0]} failed: ${detail}`);
+    throw new Error(`maestro-cli ${args[0]} failed: ${detail}`, { cause: err });
   }
 }
 
@@ -179,7 +192,7 @@ export const maestro = {
     const now = Date.now();
     if (!agentCwdCache || now - agentCwdCacheTime > AGENT_CWD_CACHE_TTL) {
       const agents = await this.listAgents();
-      agentCwdCache = new Map(agents.map(a => [a.id, a.cwd]));
+      agentCwdCache = new Map(agents.map((a) => [a.id, a.cwd]));
       agentCwdCacheTime = now;
     }
     return agentCwdCache.get(agentId) ?? null;
@@ -198,7 +211,12 @@ export const maestro = {
    * If sessionId is provided, resumes that session; otherwise starts a new one.
    * Returns the full structured response.
    */
-  async send(agentId: string, message: string, sessionId?: string, readOnly?: boolean): Promise<SendResult> {
+  async send(
+    agentId: string,
+    message: string,
+    sessionId?: string,
+    readOnly?: boolean,
+  ): Promise<SendResult> {
     const args = ['send', agentId, message];
     if (sessionId) args.push('-s', sessionId);
     if (readOnly) args.push('-r');
@@ -213,7 +231,9 @@ export const maestro = {
         try {
           const parsed = JSON.parse(stdoutMatch[1]) as SendResult;
           if (parsed.agentId && parsed.usage) return parsed;
-        } catch { /* not valid JSON, fall through */ }
+        } catch {
+          /* not valid JSON, fall through */
+        }
       }
       throw err;
     }
@@ -239,7 +259,10 @@ export const maestro = {
       timeoutMs: 30 * 60 * 1000,
       maxBuffer: 100 * 1024 * 1024, // 100MB for long JSONL output
     });
-    const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
 
     for (let i = lines.length - 1; i >= 0; i -= 1) {
       const line = lines[i];

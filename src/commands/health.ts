@@ -12,26 +12,27 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (!installed) {
     await interaction.editReply(
       '❌ `maestro-cli` not found. Please install Maestro and ensure it is in your PATH.\n' +
-      'Visit https://maestro.sh for installation instructions.'
+        'Visit https://maestro.sh for installation instructions.',
     );
     return;
   }
 
-  let agentCount = 0;
+  let agentCount: number;
   try {
-    const agents = await maestro.listAgents();
-    agentCount = agents.length;
+    agentCount = (await maestro.listAgents()).length;
   } catch (err) {
     await interaction.editReply(
       '⚠️ `maestro-cli` is installed, but failed to list agents. ' +
-      'Make sure Maestro is running.\n```' + String(err) + '```'
+        'Make sure Maestro is running.\n```' +
+        String(err) +
+        '```',
     );
     return;
   }
 
   await interaction.editReply(
     `✅ Maestro CLI is healthy.\n` +
-    `Found **${agentCount}** agent${agentCount !== 1 ? 's' : ''}. ` +
-    `Use \`/agents\` to see them.`
+      `Found **${agentCount}** agent${agentCount !== 1 ? 's' : ''}. ` +
+      `Use \`/agents\` to see them.`,
   );
 }

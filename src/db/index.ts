@@ -40,30 +40,38 @@ export interface AgentChannel {
 
 export const channelDb = {
   register(channelId: string, guildId: string, agentId: string, agentName: string): void {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO agent_channels (channel_id, guild_id, agent_id, agent_name)
       VALUES (?, ?, ?, ?)
-    `).run(channelId, guildId, agentId, agentName);
+    `,
+    ).run(channelId, guildId, agentId, agentName);
   },
 
   get(channelId: string): AgentChannel | undefined {
-    return db.prepare('SELECT * FROM agent_channels WHERE channel_id = ?')
-      .get(channelId) as AgentChannel | undefined;
+    return db.prepare('SELECT * FROM agent_channels WHERE channel_id = ?').get(channelId) as
+      | AgentChannel
+      | undefined;
   },
 
   getByAgentId(agentId: string): AgentChannel | undefined {
-    return db.prepare('SELECT * FROM agent_channels WHERE agent_id = ?')
-      .get(agentId) as AgentChannel | undefined;
+    return db.prepare('SELECT * FROM agent_channels WHERE agent_id = ?').get(agentId) as
+      | AgentChannel
+      | undefined;
   },
 
   updateSession(channelId: string, sessionId: string | null): void {
-    db.prepare('UPDATE agent_channels SET session_id = ? WHERE channel_id = ?')
-      .run(sessionId, channelId);
+    db.prepare('UPDATE agent_channels SET session_id = ? WHERE channel_id = ?').run(
+      sessionId,
+      channelId,
+    );
   },
 
   setReadOnly(channelId: string, readOnly: boolean): void {
-    db.prepare('UPDATE agent_channels SET read_only = ? WHERE channel_id = ?')
-      .run(readOnly ? 1 : 0, channelId);
+    db.prepare('UPDATE agent_channels SET read_only = ? WHERE channel_id = ?').run(
+      readOnly ? 1 : 0,
+      channelId,
+    );
   },
 
   remove(channelId: string): void {
@@ -71,20 +79,22 @@ export const channelDb = {
   },
 
   listByAgentId(agentId: string): AgentChannel[] {
-    return db.prepare('SELECT * FROM agent_channels WHERE agent_id = ?')
+    return db
+      .prepare('SELECT * FROM agent_channels WHERE agent_id = ?')
       .all(agentId) as AgentChannel[];
   },
 
   listByGuild(guildId: string): AgentChannel[] {
-    return db.prepare('SELECT * FROM agent_channels WHERE guild_id = ?')
+    return db
+      .prepare('SELECT * FROM agent_channels WHERE guild_id = ?')
       .all(guildId) as AgentChannel[];
   },
 };
 
 export interface AgentThread {
-  thread_id:  string;
+  thread_id: string;
   channel_id: string;
-  agent_id:   string;
+  agent_id: string;
   owner_user_id: string | null;
   session_id: string | null;
   created_at: number;
@@ -92,24 +102,30 @@ export interface AgentThread {
 
 export const threadDb = {
   register(threadId: string, channelId: string, agentId: string, ownerUserId: string): void {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO agent_threads (thread_id, channel_id, agent_id, owner_user_id)
       VALUES (?, ?, ?, ?)
-    `).run(threadId, channelId, agentId, ownerUserId);
+    `,
+    ).run(threadId, channelId, agentId, ownerUserId);
   },
 
   get(threadId: string): AgentThread | undefined {
-    return db.prepare('SELECT * FROM agent_threads WHERE thread_id = ?')
-      .get(threadId) as AgentThread | undefined;
+    return db.prepare('SELECT * FROM agent_threads WHERE thread_id = ?').get(threadId) as
+      | AgentThread
+      | undefined;
   },
 
   updateSession(threadId: string, sessionId: string | null): void {
-    db.prepare('UPDATE agent_threads SET session_id = ? WHERE thread_id = ?')
-      .run(sessionId, threadId);
+    db.prepare('UPDATE agent_threads SET session_id = ? WHERE thread_id = ?').run(
+      sessionId,
+      threadId,
+    );
   },
 
   listByChannel(channelId: string): AgentThread[] {
-    return db.prepare('SELECT * FROM agent_threads WHERE channel_id = ? ORDER BY created_at DESC')
+    return db
+      .prepare('SELECT * FROM agent_threads WHERE channel_id = ? ORDER BY created_at DESC')
       .all(channelId) as AgentThread[];
   },
 
@@ -118,7 +134,8 @@ export const threadDb = {
   },
 
   getByAgentId(agentId: string): AgentThread[] {
-    return db.prepare('SELECT * FROM agent_threads WHERE agent_id = ?')
+    return db
+      .prepare('SELECT * FROM agent_threads WHERE agent_id = ?')
       .all(agentId) as AgentThread[];
   },
 

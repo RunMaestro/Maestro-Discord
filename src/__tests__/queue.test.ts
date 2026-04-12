@@ -1,4 +1,4 @@
-import test, { beforeEach, mock } from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createQueue, QueueDeps } from '../services/queueFactory';
 
@@ -32,20 +32,29 @@ function defaultSendResult(extra: Record<string, unknown> = {}) {
 function createMockDeps(): QueueDeps & { _mocks: Record<string, ReturnType<typeof mock.fn>> } {
   const mockGetAgentCwd = mock.fn(async () => '/home/agent' as string | null);
   const mockSend = mock.fn(async () => defaultSendResult());
-  const mockDownload = mock.fn(async () => ({ downloaded: [] as { originalName: string; savedPath: string }[], failed: [] as string[] }));
+  const mockDownload = mock.fn(async () => ({
+    downloaded: [] as { originalName: string; savedPath: string }[],
+    failed: [] as string[],
+  }));
   const mockFormat = mock.fn(() => '');
   const mockLoggerError = mock.fn();
-  const mockChannelGet = mock.fn(() => ({
-    channel_id: 'channel-1',
-    agent_id: 'agent-1',
-    session_id: 'session-1',
-  }) as any);
-  const mockThreadGet = mock.fn(() => ({
-    thread_id: 'thread-1',
-    channel_id: 'channel-1',
-    agent_id: 'agent-1',
-    session_id: 'session-1',
-  }) as any);
+  const mockChannelGet = mock.fn(
+    () =>
+      ({
+        channel_id: 'channel-1',
+        agent_id: 'agent-1',
+        session_id: 'session-1',
+      }) as any,
+  );
+  const mockThreadGet = mock.fn(
+    () =>
+      ({
+        thread_id: 'thread-1',
+        channel_id: 'channel-1',
+        agent_id: 'agent-1',
+        session_id: 'session-1',
+      }) as any,
+  );
 
   return {
     maestro: { getAgentCwd: mockGetAgentCwd as any, send: mockSend as any },
@@ -175,7 +184,8 @@ test('queue handles attachment download failure gracefully', async () => {
 
   // Should log the error
   assert.equal((deps.logger.error as unknown as ReturnType<typeof mock.fn>).mock.callCount(), 1);
-  const logArgs = (deps.logger.error as unknown as ReturnType<typeof mock.fn>).mock.calls[0].arguments;
+  const logArgs = (deps.logger.error as unknown as ReturnType<typeof mock.fn>).mock.calls[0]
+    .arguments;
   assert.equal(logArgs[0], 'queue:attachment-download');
   assert.ok((logArgs[1] as string).includes('Network timeout'));
 

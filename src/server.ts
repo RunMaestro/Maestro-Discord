@@ -86,7 +86,7 @@ export function createServerHandler(client: Client, deps: ServerDeps) {
 
       // Find or create "Maestro Agents" category (deduplicated across concurrent requests)
       let category = guild.channels.cache.find(
-        (c) => c.type === ChannelType.GuildCategory && c.name === 'Maestro Agents'
+        (c) => c.type === ChannelType.GuildCategory && c.name === 'Maestro Agents',
       );
       if (!category) {
         if (!pendingCategory) {
@@ -103,12 +103,12 @@ export function createServerHandler(client: Client, deps: ServerDeps) {
       }
 
       const channelName = `agent-${agent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
-      const channel = (await guild.channels.create({
+      const channel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
         parent: category!.id,
         topic: `Maestro agent: ${agent.name} (${agent.id}) | ${agent.toolType} | ${agent.cwd}`,
-      }));
+      });
 
       deps.channelDb.register(channel.id, guild.id, agent.id, agent.name);
 
@@ -159,7 +159,10 @@ export function createServerHandler(client: Client, deps: ServerDeps) {
       typeof body.message !== 'string' ||
       body.message.trim() === ''
     ) {
-      sendJson(res, 400, { success: false, error: 'agentId and message are required non-empty strings' });
+      sendJson(res, 400, {
+        success: false,
+        error: 'agentId and message are required non-empty strings',
+      });
       return;
     }
 

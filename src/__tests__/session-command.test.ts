@@ -141,12 +141,29 @@ test('session list shows threads with session info', async () => {
     agent_name: 'TestBot',
   }));
   mock.method(threadDb, 'listByChannel', () => [
-    { thread_id: 'thread-1', channel_id: 'ch-1', agent_id: 'agent-1', session_id: 'sess-abc123', owner_user_id: 'user-1', created_at: 1000 },
+    {
+      thread_id: 'thread-1',
+      channel_id: 'ch-1',
+      agent_id: 'agent-1',
+      session_id: 'sess-abc123',
+      owner_user_id: 'user-1',
+      created_at: 1000,
+    },
   ]);
 
   const { maestro } = await import('../services/maestro');
   mock.method(maestro, 'listSessions', async () => [
-    { sessionId: 'sess-abc123', sessionName: 'Test', modifiedAt: '2026-04-01', messageCount: 5, costUsd: 0.05, inputTokens: 1000, outputTokens: 500, durationSeconds: 60, starred: false },
+    {
+      sessionId: 'sess-abc123',
+      sessionName: 'Test',
+      modifiedAt: '2026-04-01',
+      messageCount: 5,
+      costUsd: 0.05,
+      inputTokens: 1000,
+      outputTokens: 500,
+      durationSeconds: 60,
+      starred: false,
+    },
   ]);
 
   const interaction = makeInteraction({
@@ -194,11 +211,20 @@ test('session list handles maestro session fetch failure gracefully', async () =
     agent_name: 'TestBot',
   }));
   mock.method(threadDb, 'listByChannel', () => [
-    { thread_id: 'thread-1', channel_id: 'ch-1', agent_id: 'agent-1', session_id: 'sess-1', owner_user_id: 'user-1', created_at: 1000 },
+    {
+      thread_id: 'thread-1',
+      channel_id: 'ch-1',
+      agent_id: 'agent-1',
+      session_id: 'sess-1',
+      owner_user_id: 'user-1',
+      created_at: 1000,
+    },
   ]);
 
   const { maestro } = await import('../services/maestro');
-  mock.method(maestro, 'listSessions', async () => { throw new Error('CLI error'); });
+  mock.method(maestro, 'listSessions', async () => {
+    throw new Error('CLI error');
+  });
 
   const interaction = makeInteraction({
     options: { getSubcommand: () => 'list' },

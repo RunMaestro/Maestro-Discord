@@ -44,11 +44,14 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
         message.content.includes(`<@${botUserId}>`) ||
         message.content.includes(`<@!${botUserId}>`) ||
         (!!botRoleId && message.content.includes(`<@&${botRoleId}>`));
-      console.debug(`[mention] botUserId=${botUserId} botRoleId=${botRoleId} user=${mentionedByUser} role=${mentionedByRole} content=${mentionedByContent} raw=${JSON.stringify(message.content)}`);
+      console.debug(
+        `[mention] botUserId=${botUserId} botRoleId=${botRoleId} user=${mentionedByUser} role=${mentionedByRole} content=${mentionedByContent} raw=${JSON.stringify(message.content)}`,
+      );
       if (!mentionedByUser && !mentionedByRole && !mentionedByContent) return;
 
       try {
-        const authorName = message.member?.displayName ?? message.author.username ?? message.author.id;
+        const authorName =
+          message.member?.displayName ?? message.author.username ?? message.author.id;
         const safeAuthorName = authorName.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 48);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const threadName = `${safeAuthorName || 'user'}-${timestamp}`.slice(0, 100);
@@ -59,7 +62,12 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
           reason: `Mention-triggered thread for ${message.author.id}`,
         });
 
-        deps.threadDb.register(thread.id, message.channel.id, channelInfo.agent_id, message.author.id);
+        deps.threadDb.register(
+          thread.id,
+          message.channel.id,
+          channelInfo.agent_id,
+          message.author.id,
+        );
         await thread.send(`This thread is bound to <@${message.author.id}>.`);
 
         // Forward the triggering message to the agent via the new thread
@@ -71,7 +79,7 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
         if (cleanContent || message.attachments.size > 0) {
           // Re-upload attachments so the thread message has real discord.js
           // Attachment objects (sending bare URLs produces attachments.size===0).
-          const files = [...message.attachments.values()].map(a => ({
+          const files = [...message.attachments.values()].map((a) => ({
             attachment: a.url,
             name: a.name,
           }));

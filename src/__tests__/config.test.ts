@@ -37,10 +37,7 @@ test('config.required returns values and throws on missing keys', async () => {
     assert.equal(configModule.config.guildId, 'guild-789');
     assert.deepEqual(configModule.config.allowedUserIds, ['111', '222', '333']);
 
-    assert.throws(
-      () => configModule.required('MISSING_ENV'),
-      /Missing required env var/
-    );
+    assert.throws(() => configModule.required('MISSING_ENV'), /Missing required env var/);
   } finally {
     for (const key of Object.keys(process.env)) {
       if (!(key in previousEnv)) delete process.env[key];
