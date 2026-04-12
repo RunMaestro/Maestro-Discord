@@ -188,7 +188,8 @@ export const maestro = {
   /** List sessions for a given agent */
   async listSessions(agentId: string, limit = 25): Promise<MaestroSession[]> {
     const raw = await run(['list', 'sessions', agentId, '--json', '-l', String(limit)]);
-    return JSON.parse(raw) as MaestroSession[];
+    const parsed = JSON.parse(raw);
+    return (Array.isArray(parsed) ? parsed : parsed.sessions ?? []) as MaestroSession[];
   },
 
   /**
