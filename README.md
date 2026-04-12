@@ -149,14 +149,16 @@ Delete this file to reset all channel bindings.
 Invite the bot with both `bot` and `applications.commands` scopes:
 
 ```text
-https://discord.com/oauth2/authorize?client_id=<DISCORD_CLIENT_ID>&scope=bot+applications.commands&permissions=11280
+https://discord.com/oauth2/authorize?client_id=<DISCORD_CLIENT_ID>&scope=bot+applications.commands&permissions=11344
 ```
 
 This grants the following permissions:
 
+- Manage Channels
+- Add Reactions
 - View Channels
 - Send Messages
-- Manage Channels
+- Manage Messages
 
 Then enable **Message Content Intent** under Privileged Gateway Intents at:
 

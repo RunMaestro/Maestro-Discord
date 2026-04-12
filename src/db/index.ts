@@ -70,7 +70,7 @@ export const channelDb = {
     db.prepare('DELETE FROM agent_channels WHERE channel_id = ?').run(channelId);
   },
 
-  getByAgentId(agentId: string): AgentChannel[] {
+  listByAgentId(agentId: string): AgentChannel[] {
     return db.prepare('SELECT * FROM agent_channels WHERE agent_id = ?')
       .all(agentId) as AgentChannel[];
   },

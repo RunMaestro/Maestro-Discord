@@ -14,7 +14,7 @@ import { config } from '../config';
 const MISSING_BOT_SCOPE =
   '❌ The bot is not a member of this server. It was likely invited with only slash-command permissions.\n\n' +
   'Re-invite with both `bot` and `applications.commands` scopes:\n' +
-  `https://discord.com/oauth2/authorize?client_id=${config.clientId}&scope=bot+applications.commands&permissions=11280`;
+  `https://discord.com/oauth2/authorize?client_id=${config.clientId}&scope=bot+applications.commands&permissions=11344`;
 
 export const data = new SlashCommandBuilder()
   .setName('agents')
@@ -63,6 +63,16 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 }
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  if (!interaction.guild) {
+    const msg = interaction.guildId ? MISSING_BOT_SCOPE : 'This command must be used in a server.';
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(msg);
+    } else {
+      await interaction.reply({ content: msg, ephemeral: true });
+    }
+    return;
+  }
+
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'list') {
@@ -122,11 +132,7 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
   await interaction.deferReply({ ephemeral: true });
 
   const agentInput = interaction.options.getString('agent', true);
-  const guild = interaction.guild;
-  if (!guild) {
-    await interaction.editReply(interaction.guildId ? MISSING_BOT_SCOPE : 'This command must be used in a server.');
-    return;
-  }
+  const guild = interaction.guild!;
 
   const agents = await maestro.listAgents();
   const agent = agents.find(
@@ -207,7 +213,7 @@ async function handleDisconnect(interaction: ChatInputCommandInteraction): Promi
   // Clean up downloaded files if this is the last channel for this agent
   // (also consider threads bound to other channels for the same agent)
   const agentId = channelInfo.agent_id;
-  const otherChannels = channelDb.getByAgentId(agentId).filter(
+  const otherChannels = channelDb.listByAgentId(agentId).filter(
     (c) => c.channel_id !== interaction.channelId,
   );
   const otherThreads = threadDb.getByAgentId(agentId).filter(
