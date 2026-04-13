@@ -16,6 +16,55 @@ A Discord bot that connects your server to Maestro AI agents through `maestro-cl
 - A Discord application + bot token
 - Maestro CLI installed and authenticated
 
+### Install Maestro CLI
+
+After installing [Maestro](https://github.com/RunMaestro/Maestro), create a shell wrapper:
+
+```bash
+# macOS (after installing Maestro.app)
+printf '#!/bin/bash\nnode "/Applications/Maestro.app/Contents/Resources/maestro-cli.js" "$@"\n' | sudo tee /usr/local/bin/maestro-cli && sudo chmod +x /usr/local/bin/maestro-cli
+
+# Linux (deb/rpm installs to /opt)
+printf '#!/bin/bash\nnode "/opt/Maestro/resources/maestro-cli.js" "$@"\n' | sudo tee /usr/local/bin/maestro-cli && sudo chmod +x /usr/local/bin/maestro-cli
+
+# Windows (PowerShell as Administrator) - create a batch file
+@"
+@echo off
+node "%ProgramFiles%\Maestro\resources\maestro-cli.js" %*
+"@ | Out-File -FilePath "$env:ProgramFiles\Maestro\maestro-cli.cmd" -Encoding ASCII
+```
+
+Alternatively, run directly with Node.js:
+
+```bash
+node "/Applications/Maestro.app/Contents/Resources/maestro-cli.js" list groups
+```
+
+### Install maestro-discord CLI
+
+After building the project (`npm run build`), create a shell wrapper:
+
+```bash
+# macOS — create a global symlink to the built CLI
+printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
+
+# Linux
+printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
+
+# Windows (PowerShell as Administrator) - create a batch file
+$repoPath = (Get-Location).Path
+@"
+@echo off
+node "$repoPath\dist\cli\maestro-discord.js" %*
+"@ | Out-File -FilePath "$env:ProgramFiles\maestro-discord.cmd" -Encoding ASCII
+```
+
+Or use `npm link`:
+
+```bash
+npm link
+```
+
 CLI docs: https://docs.runmaestro.ai/
 
 ## Quick start
