@@ -20,6 +20,7 @@ function makeInteraction(overrides: Record<string, unknown> = {}) {
     },
     channel: {
       isThread: () => false,
+      isSendable: () => true,
       threads: {
         create: mock.fn(async (opts: Record<string, unknown>) => ({
           id: 'thread-new-1',
@@ -89,6 +90,7 @@ test('session new uses provided name', async () => {
   const interaction = makeInteraction({
     channel: {
       isThread: () => false,
+      isSendable: () => true,
       threads: { create: createMock },
     },
     options: {
@@ -103,9 +105,57 @@ test('session new uses provided name', async () => {
   assert.equal(createOpts.name, 'My Custom Session');
 });
 
-test('session new rejects when used in a thread', async () => {
+test('session new from a thread creates a thread on the parent agent channel', async () => {
+  const { channelDb, threadDb } = await import('../db');
+  const channelGetMock = mock.method(channelDb, 'get', (id: string) =>
+    id === 'parent-ch'
+      ? { channel_id: 'parent-ch', agent_id: 'agent-1', agent_name: 'TestBot' }
+      : undefined,
+  );
+  const registerMock = mock.method(threadDb, 'register', () => {});
+
+  const parentCreateMock = mock.fn(async (opts: Record<string, unknown>) => ({
+    id: 'thread-from-thread',
+    name: opts.name,
+    send: mock.fn(async () => ({})),
+  }));
+
   const interaction = makeInteraction({
-    channel: { isThread: () => true },
+    channelId: 'thread-src',
+    channel: {
+      isThread: () => true,
+      parentId: 'parent-ch',
+      parent: {
+        isSendable: () => true,
+        threads: { create: parentCreateMock },
+      },
+    },
+    options: { getSubcommand: () => 'new', getString: () => null },
+  });
+
+  await execute(interaction);
+
+  assert.equal(channelGetMock.mock.calls[0].arguments[0], 'parent-ch');
+  assert.equal(parentCreateMock.mock.callCount(), 1);
+  assert.equal(registerMock.mock.callCount(), 1);
+  assert.equal(registerMock.mock.calls[0].arguments[0], 'thread-from-thread');
+  assert.equal(registerMock.mock.calls[0].arguments[1], 'parent-ch');
+  assert.equal(registerMock.mock.calls[0].arguments[2], 'agent-1');
+});
+
+test('session new from a thread whose parent is not an agent channel rejects', async () => {
+  const { channelDb } = await import('../db');
+  mock.method(channelDb, 'get', () => undefined);
+
+  const interaction = makeInteraction({
+    channel: {
+      isThread: () => true,
+      parentId: 'parent-ch',
+      parent: {
+        isSendable: () => true,
+        threads: { create: mock.fn() },
+      },
+    },
     options: { getSubcommand: () => 'new', getString: () => null },
   });
 
@@ -113,7 +163,20 @@ test('session new rejects when used in a thread', async () => {
 
   assert.equal(interaction.reply.mock.callCount(), 1);
   const reply = interaction.reply.mock.calls[0].arguments[0];
-  assert.ok(reply.content.includes('main agent channel'));
+  assert.ok(reply.content.includes('not connected to an agent'));
+});
+
+test('session new from a thread with no parentId rejects', async () => {
+  const interaction = makeInteraction({
+    channel: { isThread: () => true, parentId: null, parent: null },
+    options: { getSubcommand: () => 'new', getString: () => null },
+  });
+
+  await execute(interaction);
+
+  assert.equal(interaction.reply.mock.callCount(), 1);
+  const reply = interaction.reply.mock.calls[0].arguments[0];
+  assert.ok(reply.content.includes('parent channel'));
 });
 
 test('session new rejects when not in an agent channel', async () => {
@@ -238,16 +301,34 @@ test('session list handles maestro session fetch failure gracefully', async () =
   assert.ok(reply.embeds[0].data.description.includes('No messages yet'));
 });
 
-test('session list rejects when used in a thread', async () => {
+test('session list from a thread lists threads of the parent agent channel', async () => {
+  const { channelDb, threadDb } = await import('../db');
+  mock.method(channelDb, 'get', (id: string) =>
+    id === 'parent-ch'
+      ? { channel_id: 'parent-ch', agent_id: 'agent-1', agent_name: 'TestBot' }
+      : undefined,
+  );
+  const listMock = mock.method(threadDb, 'listByChannel', () => []);
+
   const interaction = makeInteraction({
-    channel: { isThread: () => true },
+    channelId: 'thread-src',
+    channel: {
+      isThread: () => true,
+      parentId: 'parent-ch',
+      parent: {
+        isSendable: () => true,
+        threads: { create: mock.fn() },
+      },
+    },
     options: { getSubcommand: () => 'list' },
   });
 
   await execute(interaction);
 
-  const reply = interaction.reply.mock.calls[0].arguments[0];
-  assert.ok(reply.content.includes('main agent channel'));
+  assert.equal(listMock.mock.calls[0].arguments[0], 'parent-ch');
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  assert.ok(typeof reply === 'string');
+  assert.ok(reply.includes('No session threads'));
 });
 
 test('session list rejects non-agent channels', async () => {

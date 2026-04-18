@@ -5,7 +5,7 @@ import {
   TextChannel,
   ThreadAutoArchiveDuration,
 } from 'discord.js';
-import { channelDb, threadDb } from '../db';
+import { AgentChannel, channelDb, threadDb } from '../db';
 import { maestro, MaestroSession } from '../services/maestro';
 
 export const data = new SlashCommandBuilder()
@@ -32,15 +32,37 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 }
 
-async function validateAgentChannel(interaction: ChatInputCommandInteraction) {
+interface ResolvedAgentChannel {
+  channelInfo: AgentChannel;
+  parentChannel: TextChannel | null;
+  parentChannelId: string;
+}
+
+async function resolveAgentChannel(
+  interaction: ChatInputCommandInteraction,
+): Promise<ResolvedAgentChannel | undefined> {
+  let parentChannelId = interaction.channelId;
+  let parentChannel: TextChannel | null = null;
+
   if (interaction.channel?.isThread()) {
-    await interaction.reply({
-      content: '❌ Run this command in the main agent channel, not inside a thread.',
-      ephemeral: true,
-    });
-    return undefined;
+    const parentId = interaction.channel.parentId;
+    if (!parentId) {
+      await interaction.reply({
+        content: '❌ Could not resolve the parent channel for this thread.',
+        ephemeral: true,
+      });
+      return undefined;
+    }
+    parentChannelId = parentId;
+    const parent = interaction.channel.parent;
+    if (parent?.isSendable() && 'threads' in parent) {
+      parentChannel = parent as TextChannel;
+    }
+  } else if (interaction.channel?.isSendable() && 'threads' in interaction.channel) {
+    parentChannel = interaction.channel as TextChannel;
   }
-  const channelInfo = channelDb.get(interaction.channelId);
+
+  const channelInfo = channelDb.get(parentChannelId);
   if (!channelInfo) {
     await interaction.reply({
       content: '❌ This channel is not connected to an agent. Use `/agents connect` first.',
@@ -48,12 +70,22 @@ async function validateAgentChannel(interaction: ChatInputCommandInteraction) {
     });
     return undefined;
   }
-  return channelInfo;
+
+  return { channelInfo, parentChannel, parentChannelId };
 }
 
 async function handleNew(interaction: ChatInputCommandInteraction): Promise<void> {
-  const channelInfo = await validateAgentChannel(interaction);
-  if (!channelInfo) {
+  const resolved = await resolveAgentChannel(interaction);
+  if (!resolved) {
+    return;
+  }
+  const { channelInfo, parentChannel, parentChannelId } = resolved;
+
+  if (!parentChannel) {
+    await interaction.reply({
+      content: '❌ Could not access the parent agent channel.',
+      ephemeral: true,
+    });
     return;
   }
 
@@ -64,13 +96,13 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
     providedName ??
     `Session ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
-  const thread = await (interaction.channel as TextChannel).threads.create({
+  const thread = await parentChannel.threads.create({
     name: threadName,
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     reason: `Maestro session for agent ${channelInfo.agent_name}`,
   });
 
-  threadDb.register(thread.id, interaction.channelId, channelInfo.agent_id, interaction.user.id);
+  threadDb.register(thread.id, parentChannelId, channelInfo.agent_id, interaction.user.id);
 
   await thread.send(
     `🤖 **${channelInfo.agent_name}** — ready for a new session.\nType your first message to begin. This thread is linked to a dedicated Maestro session.\nOnly <@${interaction.user.id}> can interact with the agent in this thread.`,
@@ -82,14 +114,15 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
 }
 
 async function handleList(interaction: ChatInputCommandInteraction): Promise<void> {
-  const channelInfo = await validateAgentChannel(interaction);
-  if (!channelInfo) {
+  const resolved = await resolveAgentChannel(interaction);
+  if (!resolved) {
     return;
   }
+  const { channelInfo, parentChannelId } = resolved;
 
   await interaction.deferReply({ ephemeral: true });
 
-  const dbThreads = threadDb.listByChannel(interaction.channelId);
+  const dbThreads = threadDb.listByChannel(parentChannelId);
   if (dbThreads.length === 0) {
     await interaction.editReply('No session threads yet. Use `/session new` to create one.');
     return;
