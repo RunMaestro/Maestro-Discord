@@ -2,11 +2,12 @@
 
 [![Made with Maestro](https://raw.githubusercontent.com/RunMaestro/Maestro/main/docs/assets/made-with-maestro.svg)](https://github.com/RunMaestro/Maestro)
 
-A Discord bot that connects your server to Maestro AI agents through `maestro-cli`.
+A Discord bot that connects your server to [Maestro](https://runmaestro.ai) AI agents through `maestro-cli`.
 
 ## Features
 
 - Creates dedicated Discord channels for Maestro agents
+- Per-user session threads — start one with `/session new` or by @mentioning the bot in an agent channel
 - Queues messages per channel for orderly processing
 - Streams agent replies back into Discord, including usage stats
 
@@ -14,25 +15,21 @@ A Discord bot that connects your server to Maestro AI agents through `maestro-cl
 
 - Node.js 18+
 - A Discord application + bot token
-- [Maestro CLI](https://docs.runmaestro.ai/cli) installed and authenticated
+- [Maestro CLI](https://docs.runmaestro.ai/cli) available on your `PATH` (no authentication required)
 
 ### Install maestro-discord CLI
 
-After building the project (`npm run build`), create a shell wrapper:
+The `maestro-discord` CLI lets your Maestro agents reach out to you on Discord — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
 
-macOS — create a global wrapper for the built CLI:
+After building the project (`npm run build`), create a shell wrapper.
 
-```bash
-printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
-```
-
-Linux:
+macOS / Linux:
 
 ```bash
 printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
 ```
 
-Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user PATH:
+Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user `PATH`:
 
 ```powershell
 $repoPath = (Get-Location).Path
@@ -55,8 +52,6 @@ Or use `npm link`:
 ```bash
 npm link
 ```
-
-CLI docs: https://docs.runmaestro.ai/
 
 ## Quick start
 
@@ -105,13 +100,13 @@ npm start
 ## Tests
 
 ```bash
-node --test --import tsx
+npm test
 ```
 
 Coverage:
 
 ```bash
-node --test --experimental-test-coverage --import tsx
+npm run build && node --test --experimental-test-coverage dist/__tests__/**/*.test.js
 ```
 
 ## Slash commands
@@ -120,7 +115,7 @@ node --test --experimental-test-coverage --import tsx
 | -------------------------- | ------------------------------------------------------------- |
 | `/health`                  | Verify Maestro CLI is installed and working                   |
 | `/agents list`             | Show all available agents                                     |
-| `/agents new <agent-id>`   | Create a dedicated channel for an agent                       |
+| `/agents new <agent>`      | Create a dedicated channel for an agent (autocomplete)        |
 | `/agents disconnect`       | (Run inside an agent channel) Remove and delete the channel   |
 | `/agents readonly on\|off` | Toggle read-only mode for the current agent channel           |
 | `/session new`             | Create a new owner-bound thread for the current agent channel |
@@ -128,7 +123,7 @@ node --test --experimental-test-coverage --import tsx
 
 ## How it works
 
-Mention the bot in an agent channel to create a thread, then chat — messages are queued and forwarded to the agent via `maestro-cli`. See [docs/architecture.md](docs/architecture.md) for the full message flow, thread ownership model, and project layout.
+Mention the bot or run `/session new` in an agent channel to create a thread, then chat — messages are queued and forwarded to the agent via `maestro-cli`. See [docs/architecture.md](docs/architecture.md) for the full message flow, thread ownership model, and project layout.
 
 ## Maestro-to-Discord Messaging
 
@@ -171,5 +166,5 @@ Without this the bot will fail to connect with a "Used disallowed intents" error
 
 ## Troubleshooting
 
-- If `/health` fails, ensure `maestro-cli` is on your PATH and you are logged in.
+- If `/health` fails, ensure `maestro-cli` is on your `PATH`.
 - If commands don’t appear, re-run `npm run deploy-commands` after updating your bot or application settings.
