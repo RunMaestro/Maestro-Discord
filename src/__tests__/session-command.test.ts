@@ -20,6 +20,7 @@ function makeInteraction(overrides: Record<string, unknown> = {}) {
     },
     channel: {
       isThread: () => false,
+      isSendable: () => true,
       threads: {
         create: mock.fn(async (opts: Record<string, unknown>) => ({
           id: 'thread-new-1',
@@ -89,6 +90,7 @@ test('session new uses provided name', async () => {
   const interaction = makeInteraction({
     channel: {
       isThread: () => false,
+      isSendable: () => true,
       threads: { create: createMock },
     },
     options: {
@@ -123,7 +125,10 @@ test('session new from a thread creates a thread on the parent agent channel', a
     channel: {
       isThread: () => true,
       parentId: 'parent-ch',
-      parent: { threads: { create: parentCreateMock } },
+      parent: {
+        isSendable: () => true,
+        threads: { create: parentCreateMock },
+      },
     },
     options: { getSubcommand: () => 'new', getString: () => null },
   });
@@ -146,7 +151,10 @@ test('session new from a thread whose parent is not an agent channel rejects', a
     channel: {
       isThread: () => true,
       parentId: 'parent-ch',
-      parent: { threads: { create: mock.fn() } },
+      parent: {
+        isSendable: () => true,
+        threads: { create: mock.fn() },
+      },
     },
     options: { getSubcommand: () => 'new', getString: () => null },
   });
@@ -307,7 +315,10 @@ test('session list from a thread lists threads of the parent agent channel', asy
     channel: {
       isThread: () => true,
       parentId: 'parent-ch',
-      parent: { threads: { create: mock.fn() } },
+      parent: {
+        isSendable: () => true,
+        threads: { create: mock.fn() },
+      },
     },
     options: { getSubcommand: () => 'list' },
   });

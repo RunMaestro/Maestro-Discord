@@ -34,7 +34,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
 interface ResolvedAgentChannel {
   channelInfo: AgentChannel;
-  parentChannel: TextChannel;
+  parentChannel: TextChannel | null;
   parentChannelId: string;
 }
 
@@ -42,7 +42,7 @@ async function resolveAgentChannel(
   interaction: ChatInputCommandInteraction,
 ): Promise<ResolvedAgentChannel | undefined> {
   let parentChannelId = interaction.channelId;
-  let parentChannel: TextChannel | null = interaction.channel as TextChannel | null;
+  let parentChannel: TextChannel | null = null;
 
   if (interaction.channel?.isThread()) {
     const parentId = interaction.channel.parentId;
@@ -54,21 +54,18 @@ async function resolveAgentChannel(
       return undefined;
     }
     parentChannelId = parentId;
-    parentChannel = (interaction.channel.parent as TextChannel | null) ?? null;
+    const parent = interaction.channel.parent;
+    if (parent?.isSendable() && 'threads' in parent) {
+      parentChannel = parent as TextChannel;
+    }
+  } else if (interaction.channel?.isSendable() && 'threads' in interaction.channel) {
+    parentChannel = interaction.channel as TextChannel;
   }
 
   const channelInfo = channelDb.get(parentChannelId);
   if (!channelInfo) {
     await interaction.reply({
       content: '❌ This channel is not connected to an agent. Use `/agents connect` first.',
-      ephemeral: true,
-    });
-    return undefined;
-  }
-
-  if (!parentChannel) {
-    await interaction.reply({
-      content: '❌ Could not access the parent agent channel.',
       ephemeral: true,
     });
     return undefined;
@@ -83,6 +80,14 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
     return;
   }
   const { channelInfo, parentChannel, parentChannelId } = resolved;
+
+  if (!parentChannel) {
+    await interaction.reply({
+      content: '❌ Could not access the parent agent channel.',
+      ephemeral: true,
+    });
+    return;
+  }
 
   await interaction.deferReply({ ephemeral: false });
 

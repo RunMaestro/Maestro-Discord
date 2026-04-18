@@ -18,10 +18,22 @@ function requiredCsv(key: string): string[] {
 }
 
 export const config = {
-  token: required('DISCORD_BOT_TOKEN'),
-  clientId: required('DISCORD_CLIENT_ID'),
-  guildId: required('DISCORD_GUILD_ID'),
-  allowedUserIds: requiredCsv('DISCORD_ALLOWED_USER_IDS'),
-  apiPort: parseInt(process.env.API_PORT || '3457', 10),
-  mentionUserId: process.env.DISCORD_MENTION_USER_ID || '',
+  get token() {
+    return required('DISCORD_BOT_TOKEN');
+  },
+  get clientId() {
+    return required('DISCORD_CLIENT_ID');
+  },
+  get guildId() {
+    return required('DISCORD_GUILD_ID');
+  },
+  get allowedUserIds() {
+    return requiredCsv('DISCORD_ALLOWED_USER_IDS');
+  },
+  get apiPort() {
+    return parseInt(process.env.API_PORT || '3457', 10);
+  },
+  get mentionUserId() {
+    return process.env.DISCORD_MENTION_USER_ID || '';
+  },
 };
