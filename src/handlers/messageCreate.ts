@@ -125,7 +125,7 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       return;
     }
 
-    let typingInterval: ReturnType<typeof setInterval> | undefined;
+    let typingRefreshInterval: ReturnType<typeof setInterval> | undefined;
     try {
       const sendTyping = () =>
         message.channel.sendTyping().catch((err) => {
@@ -133,7 +133,7 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
           logWarn('messageCreate: failed to send typing indicator:', err);
         });
 
-      typingInterval = setInterval(() => {
+      typingRefreshInterval = setInterval(() => {
         void sendTyping();
       }, TYPING_INDICATOR_REFRESH_INTERVAL_MS);
       void sendTyping();
@@ -166,10 +166,10 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       const log = deps.logger?.error ?? console.error;
       log('messageCreate: failed to transcribe voice message:', err);
       await message.reply(
-        '❌ Failed to transcribe this voice message. Please try again and confirm the attachment is a supported audio file.',
+        '❌ Failed to transcribe this voice message. Please confirm it is a valid .ogg voice message and that ffmpeg/whisper-cli are configured.',
       );
     } finally {
-      if (typingInterval) clearInterval(typingInterval);
+      if (typingRefreshInterval) clearInterval(typingRefreshInterval);
     }
   };
 }
