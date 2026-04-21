@@ -4,8 +4,6 @@ import { enqueue } from '../services/queue';
 import { isVoiceAttachment, transcribeVoiceAttachment } from '../services/transcription';
 import { splitMessage } from '../utils/splitMessage';
 
-const TYPING_INDICATOR_REFRESH_INTERVAL_MS = 8000;
-
 type MessageCreateDeps = {
   channelDb: Pick<typeof channelDb, 'get'>;
   threadDb: Pick<typeof threadDb, 'get' | 'register'>;
@@ -125,21 +123,14 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       return;
     }
 
-    let typingRefreshInterval: ReturnType<typeof setInterval> | undefined;
+    let reaction: Awaited<ReturnType<typeof message.react>> | undefined;
     try {
-      const sendTyping = () =>
-        message.channel.sendTyping().catch((err) => {
-          const logWarn = deps.logger?.warn ?? console.warn;
-          logWarn('messageCreate: failed to send typing indicator:', err);
-        });
+      reaction = await message.react('🎧');
+    } catch {
+      // Reaction may fail if message was deleted or bot lacks perms; continue anyway
+    }
 
-      void sendTyping();
-      typingRefreshInterval = setInterval(() => {
-        void sendTyping();
-      }, TYPING_INDICATOR_REFRESH_INTERVAL_MS);
-
-      await message.reply('🎙️ Transcribing voice message...');
-
+    try {
       const transcriptions: string[] = [];
       for (const attachment of voiceAttachments) {
         const transcription = await deps.transcribeVoiceAttachment(attachment);
@@ -153,7 +144,7 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       const transcriptionText = transcriptions.join('\n\n');
       const replyResults = await Promise.allSettled(
         deps
-          .splitMessage(`📝 **Transcription:**\n${transcriptionText}`)
+          .splitMessage(`🎧 ${transcriptionText}`)
           .map((part) => message.reply(part)),
       );
       const failedReplies = replyResults.filter((result) => result.status === 'rejected');
@@ -162,19 +153,29 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
         logWarn(`messageCreate: failed to send ${failedReplies.length} transcription reply part(s)`);
       }
 
+      try {
+        await reaction?.remove();
+      } catch {
+        // Ignore if already removed or no permission
+      }
+
       const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
       deps.enqueue(message, {
         contentOverride,
         skipAttachments: true,
       });
     } catch (err) {
+      try {
+        await reaction?.remove();
+      } catch {
+        // Ignore if already removed or no permission
+      }
+
       const log = deps.logger?.error ?? console.error;
       log('messageCreate: failed to transcribe voice message:', err);
       await message.reply(
         '❌ Failed to transcribe this voice message. Please confirm it is a valid .ogg voice message and that ffmpeg/whisper-cli are configured.',
       );
-    } finally {
-      if (typingRefreshInterval) clearInterval(typingRefreshInterval);
     }
   };
 }

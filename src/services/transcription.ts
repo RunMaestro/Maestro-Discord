@@ -69,6 +69,7 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
       `${quoteArg(config.whisperCliPath)} -m ${quoteArg(config.whisperModelPath)} -f ${quoteArg(wavPath)} -otxt -of ${quoteArg(outputBase)}`,
     );
 
+
     const transcription = (await readFile(outputTxtPath, 'utf8')).trim();
     if (!transcription) {
       throw new Error(
@@ -76,9 +77,10 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
       );
     }
     return transcription;
-  } finally {
-    await rm(tempDir, { recursive: true, force: true }).catch((err) => {
-      logger.warn(`Failed to clean up temp transcription files at "${tempDir}":`, err);
-    });
+  } 
+  finally {
+    //await rm(tempDir, { recursive: true, force: true }).catch((err) => {
+    //  logger.error(`Failed to clean up temp transcription files at "${tempDir}":`, err);
+    //});
   }
 }

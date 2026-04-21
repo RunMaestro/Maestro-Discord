@@ -327,6 +327,7 @@ test('handleMessageCreate ignores non-thread channel messages without bot mentio
 test('handleMessageCreate transcribes voice messages and enqueues transcription text', async () => {
   const enqueueCalls: unknown[][] = [];
   const replies: string[] = [];
+  const reactions: string[] = [];
   const deps = createDeps((...args: unknown[]) => {
     enqueueCalls.push(args);
   });
@@ -345,19 +346,24 @@ test('handleMessageCreate transcribes voice messages and enqueues transcription 
         replies.push(msg);
         return undefined;
       },
+      react: async (emoji: string) => {
+        reactions.push(emoji);
+        return { remove: async () => undefined };
+      },
     }) as any,
   );
 
   assert.equal(enqueueCalls.length, 1);
   assert.equal((enqueueCalls[0][1] as any).contentOverride, 'hello from voice');
   assert.equal((enqueueCalls[0][1] as any).skipAttachments, true);
-  assert.ok(replies.some((r) => r.includes('Transcribing voice message')));
-  assert.ok(replies.some((r) => r.includes('Transcription')));
+  assert.ok(reactions.includes('🎧'), 'should have 🎧 reaction');
+  assert.ok(replies.some((r) => r.includes('🎧')), 'should have 🎧 in transcription reply');
 });
 
 test('handleMessageCreate reports transcription failures and does not enqueue', async () => {
   let enqueued = 0;
   const replies: string[] = [];
+  const reactions: string[] = [];
   const deps = createDeps(() => {
     enqueued += 1;
   });
@@ -377,9 +383,14 @@ test('handleMessageCreate reports transcription failures and does not enqueue', 
         replies.push(msg);
         return undefined;
       },
+      react: async (emoji: string) => {
+        reactions.push(emoji);
+        return { remove: async () => undefined };
+      },
     }) as any,
   );
 
   assert.equal(enqueued, 0);
+  assert.ok(reactions.includes('🎧'), 'should have 🎧 reaction even on failure');
   assert.ok(replies.some((r) => r.includes('Failed to transcribe this voice message')));
 });
