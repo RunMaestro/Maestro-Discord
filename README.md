@@ -76,9 +76,34 @@ DISCORD_GUILD_ID=    # Your server's ID (right-click server → Copy ID)
 DISCORD_ALLOWED_USER_IDS=123,456  # Optional: comma-separated user IDs allowed to run slash commands
 API_PORT=3457                     # Optional: port for internal API (default 3457)
 DISCORD_MENTION_USER_ID=          # Optional: Discord user ID to @mention when --mention is used
-FFMPEG_PATH=ffmpeg                # Optional: override ffmpeg binary (default: ffmpeg)
-WHISPER_CLI_PATH=whisper-cli      # Optional: override whisper-cli binary (default: whisper-cli)
-WHISPER_MODEL_PATH=models/ggml-base.en.bin # Optional: whisper.cpp model path
+FFMPEG_PATH=/opt/homebrew/bin/ffmpeg                # Optional: path to ffmpeg binary
+WHISPER_CLI_PATH=/opt/homebrew/bin/whisper-cli      # Optional: path to whisper-cli binary
+WHISPER_MODEL_PATH=./models/ggml-small.en.bin       # Optional: path to whisper.cpp model
+```
+
+### Voice Transcription Setup
+
+To enable voice message transcription, you need [ffmpeg](https://ffmpeg.org/) and [whisper-cli](https://github.com/ggerganov/whisper.cpp) (from [FM pack](https://www.whisk.ai/fm-pack-whisper-cpp)). Both projects are cross-platform and work on macOS, Linux, and Windows.
+
+1. Install ffmpeg and whisper-cli (e.g., via Homebrew on macOS):
+
+```bash
+brew install ffmpeg whisper-cli
+```
+
+2. Download the whisper model:
+
+```bash
+mkdir -p ./models
+curl -L -o models/ggml-small.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
+```
+
+3. Set the environment variables in `.env` (optional if using default system paths):
+
+```bash
+export FFMPEG_PATH='/opt/homebrew/bin/ffmpeg'
+export WHISPER_CLI_PATH='/opt/homebrew/bin/whisper-cli'
+export WHISPER_MODEL_PATH='./models/ggml-small.en.bin'
 ```
 
 3. Deploy slash commands:
