@@ -4,7 +4,7 @@ import { enqueue } from '../services/queue';
 import { isVoiceAttachment, transcribeVoiceAttachment } from '../services/transcription';
 import { splitMessage } from '../utils/splitMessage';
 
-const TYPING_INDICATOR_INTERVAL_MS = 8000;
+const TYPING_INDICATOR_REFRESH_INTERVAL_MS = 8000;
 
 type MessageCreateDeps = {
   channelDb: Pick<typeof channelDb, 'get'>;
@@ -127,10 +127,16 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
 
     let typingInterval: ReturnType<typeof setInterval> | undefined;
     try {
+      const sendTyping = () =>
+        message.channel.sendTyping().catch((err) => {
+          const logWarn = deps.logger?.warn ?? console.warn;
+          logWarn('messageCreate: failed to send typing indicator:', err);
+        });
+
       typingInterval = setInterval(() => {
-        message.channel.sendTyping().catch(() => {});
-      }, TYPING_INDICATOR_INTERVAL_MS);
-      message.channel.sendTyping().catch(() => {});
+        void sendTyping();
+      }, TYPING_INDICATOR_REFRESH_INTERVAL_MS);
+      void sendTyping();
 
       await message.reply('🎙️ Transcribing voice message...');
 
@@ -145,9 +151,11 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       }
 
       const transcriptionText = transcriptions.join('\n\n');
-      for (const part of deps.splitMessage(`📝 **Transcription:**\n${transcriptionText}`)) {
-        await message.reply(part);
-      }
+      await Promise.allSettled(
+        deps
+          .splitMessage(`📝 **Transcription:**\n${transcriptionText}`)
+          .map((part) => message.reply(part)),
+      );
 
       const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
       deps.enqueue(message, {

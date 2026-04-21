@@ -53,6 +53,9 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
     }
 
     const audioBuffer = Buffer.from(await response.arrayBuffer());
+    if (audioBuffer.subarray(0, 4).toString('ascii') !== 'OggS') {
+      throw new Error('Voice attachment is not a valid OGG/Opus file.');
+    }
     await writeFile(inputPath, audioBuffer);
 
     await runCommand(
@@ -71,6 +74,8 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
     }
     return transcription;
   } finally {
-    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await rm(tempDir, { recursive: true, force: true }).catch((err) => {
+      console.warn(`Failed to clean up temp transcription files at "${tempDir}":`, err);
+    });
   }
 }
