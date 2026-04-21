@@ -1,12 +1,20 @@
 import { Message, TextChannel, ThreadAutoArchiveDuration } from 'discord.js';
 import { channelDb, threadDb } from '../db';
 import { enqueue } from '../services/queue';
+import { isVoiceAttachment, transcribeVoiceAttachment } from '../services/transcription';
+import { splitMessage } from '../utils/splitMessage';
 
 type MessageCreateDeps = {
   channelDb: Pick<typeof channelDb, 'get'>;
   threadDb: Pick<typeof threadDb, 'get' | 'register'>;
   getBotUserId: (message: Message) => string | undefined;
-  enqueue: (message: Message) => void;
+  enqueue: (
+    message: Message,
+    options?: { contentOverride?: string; skipAttachments?: boolean },
+  ) => void;
+  isVoiceAttachment: typeof isVoiceAttachment;
+  transcribeVoiceAttachment: typeof transcribeVoiceAttachment;
+  splitMessage: typeof splitMessage;
   logger?: Pick<Console, 'warn' | 'error'>;
 };
 
@@ -107,7 +115,50 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
     const ownerUserId = threadInfo.owner_user_id?.trim();
     if (ownerUserId && ownerUserId !== message.author.id) return;
 
-    deps.enqueue(message);
+    const voiceAttachments = [...message.attachments.values()].filter((attachment) =>
+      deps.isVoiceAttachment(attachment),
+    );
+    if (voiceAttachments.length === 0) {
+      deps.enqueue(message);
+      return;
+    }
+
+    let typingInterval: ReturnType<typeof setInterval> | undefined;
+    try {
+      typingInterval = setInterval(() => {
+        message.channel.sendTyping().catch(() => {});
+      }, 8000);
+      message.channel.sendTyping().catch(() => {});
+
+      await message.reply('🎙️ Transcribing voice message...');
+
+      const transcriptions: string[] = [];
+      for (const attachment of voiceAttachments) {
+        const transcription = await deps.transcribeVoiceAttachment(attachment);
+        transcriptions.push(
+          voiceAttachments.length === 1
+            ? transcription
+            : `**${attachment.name}**\n${transcription}`,
+        );
+      }
+
+      const transcriptionText = transcriptions.join('\n\n');
+      for (const part of deps.splitMessage(`📝 **Transcription:**\n${transcriptionText}`)) {
+        await message.reply(part);
+      }
+
+      const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
+      deps.enqueue(message, {
+        contentOverride,
+        skipAttachments: true,
+      });
+    } catch (err) {
+      const log = deps.logger?.error ?? console.error;
+      log('messageCreate: failed to transcribe voice message:', err);
+      await message.reply('❌ Failed to transcribe this voice message.');
+    } finally {
+      if (typingInterval) clearInterval(typingInterval);
+    }
   };
 }
 
@@ -116,5 +167,8 @@ export const handleMessageCreate = createMessageCreateHandler({
   threadDb,
   getBotUserId: (message) => message.client.user?.id,
   enqueue,
+  isVoiceAttachment,
+  transcribeVoiceAttachment,
+  splitMessage,
   logger: console,
 });

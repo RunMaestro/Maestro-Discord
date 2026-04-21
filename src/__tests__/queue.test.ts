@@ -275,3 +275,33 @@ test('queue warns when agent cwd cannot be resolved for attachments', async () =
   );
   assert.ok(warningCall, 'Expected a warning about unresolved agent cwd');
 });
+
+test('queue uses contentOverride when provided', async () => {
+  const deps = createMockDeps();
+  const { enqueue } = createQueue(deps);
+  enqueue(makeMessage({ content: 'original text' }), { contentOverride: 'transcribed text' });
+  await settle();
+
+  assert.equal(deps._mocks.send.mock.callCount(), 1);
+  assert.equal(deps._mocks.send.mock.calls[0].arguments[1], 'transcribed text');
+});
+
+test('queue skips attachment downloads when skipAttachments is true', async () => {
+  const deps = createMockDeps();
+  const { enqueue } = createQueue(deps);
+  enqueue(
+    makeMessage({
+      content: 'voice text',
+      attachments: {
+        size: 1,
+        values: () => [{ url: 'https://cdn.example.com/voice.ogg', name: 'voice.ogg', size: 100 }],
+      },
+    }),
+    { skipAttachments: true },
+  );
+  await settle();
+
+  assert.equal(deps._mocks.download.mock.callCount(), 0);
+  assert.equal(deps._mocks.send.mock.callCount(), 1);
+  assert.equal(deps._mocks.send.mock.calls[0].arguments[1], 'voice text');
+});

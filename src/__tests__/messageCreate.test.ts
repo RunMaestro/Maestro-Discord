@@ -13,7 +13,9 @@ function makeMessage(overrides: Partial<Record<string, unknown>> = {}) {
     channel: {
       id: 'thread-1',
       isThread: () => true,
+      sendTyping: async () => undefined,
     },
+    reply: async () => undefined,
     ...overrides,
   } as unknown;
 }
@@ -27,6 +29,9 @@ function createDeps(enqueue: (...args: any[]) => void) {
     },
     getBotUserId: () => 'bot-1',
     enqueue,
+    isVoiceAttachment: () => false,
+    transcribeVoiceAttachment: async () => '',
+    splitMessage: (text: string) => [text],
   };
 }
 
@@ -317,4 +322,64 @@ test('handleMessageCreate ignores non-thread channel messages without bot mentio
   );
 
   assert.equal(created, 0);
+});
+
+test('handleMessageCreate transcribes voice messages and enqueues transcription text', async () => {
+  const enqueueCalls: unknown[][] = [];
+  const replies: string[] = [];
+  const deps = createDeps((...args: unknown[]) => {
+    enqueueCalls.push(args);
+  });
+  deps.isVoiceAttachment = () => true;
+  deps.transcribeVoiceAttachment = async () => 'hello from voice';
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      content: '',
+      attachments: {
+        size: 1,
+        values: () => [{ url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' }],
+      },
+      reply: async (msg: string) => {
+        replies.push(msg);
+        return undefined;
+      },
+    }) as any,
+  );
+
+  assert.equal(enqueueCalls.length, 1);
+  assert.equal((enqueueCalls[0][1] as any).contentOverride, 'hello from voice');
+  assert.equal((enqueueCalls[0][1] as any).skipAttachments, true);
+  assert.ok(replies.some((r) => r.includes('Transcribing voice message')));
+  assert.ok(replies.some((r) => r.includes('Transcription')));
+});
+
+test('handleMessageCreate reports transcription failures and does not enqueue', async () => {
+  let enqueued = 0;
+  const replies: string[] = [];
+  const deps = createDeps(() => {
+    enqueued += 1;
+  });
+  deps.isVoiceAttachment = () => true;
+  deps.transcribeVoiceAttachment = async () => {
+    throw new Error('boom');
+  };
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      attachments: {
+        size: 1,
+        values: () => [{ url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' }],
+      },
+      reply: async (msg: string) => {
+        replies.push(msg);
+        return undefined;
+      },
+    }) as any,
+  );
+
+  assert.equal(enqueued, 0);
+  assert.ok(replies.some((r) => r.includes('Failed to transcribe this voice message')));
 });

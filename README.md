@@ -76,6 +76,9 @@ DISCORD_GUILD_ID=    # Your server's ID (right-click server → Copy ID)
 DISCORD_ALLOWED_USER_IDS=123,456  # Optional: comma-separated user IDs allowed to run slash commands
 API_PORT=3457                     # Optional: port for internal API (default 3457)
 DISCORD_MENTION_USER_ID=          # Optional: Discord user ID to @mention when --mention is used
+FFMPEG_PATH=ffmpeg                # Optional: override ffmpeg binary (default: ffmpeg)
+WHISPER_CLI_PATH=whisper-cli      # Optional: override whisper-cli binary (default: whisper-cli)
+WHISPER_MODEL_PATH=models/ggml-base.en.bin # Optional: whisper.cpp model path
 ```
 
 3. Deploy slash commands:

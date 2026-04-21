@@ -36,4 +36,13 @@ export const config = {
   get mentionUserId() {
     return process.env.DISCORD_MENTION_USER_ID || '';
   },
+  get ffmpegPath() {
+    return process.env.FFMPEG_PATH || 'ffmpeg';
+  },
+  get whisperCliPath() {
+    return process.env.WHISPER_CLI_PATH || 'whisper-cli';
+  },
+  get whisperModelPath() {
+    return process.env.WHISPER_MODEL_PATH || 'models/ggml-base.en.bin';
+  },
 };
