@@ -217,7 +217,12 @@ export const maestro = {
     sessionId?: string,
     readOnly?: boolean,
   ): Promise<SendResult> {
-    const args = ['send', agentId, message];
+    let messageArg = message;
+    // Prevent dash-like chars at start from being parsed as options
+    if (messageArg.match(/^[\-—–−]/)) {
+      messageArg = '​' + messageArg; // Zero-width space prefix
+    }
+    const args = ['send', agentId, messageArg];
     if (sessionId) args.push('-s', sessionId);
     if (readOnly) args.push('-r');
     try {
