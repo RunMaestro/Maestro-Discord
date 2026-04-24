@@ -31,6 +31,7 @@ function createDeps(enqueue: (...args: any[]) => void) {
     enqueue,
     isVoiceAttachment: () => false,
     transcribeVoiceAttachment: async () => '',
+    isTranscriberAvailable: () => true,
     splitMessage: (text: string) => [text],
   };
 }
@@ -360,7 +361,7 @@ test('handleMessageCreate transcribes voice messages and enqueues transcription 
   assert.ok(replies.some((r) => r.includes('🎧')), 'should have 🎧 in transcription reply');
 });
 
-test('handleMessageCreate reports transcription failures and does not enqueue', async () => {
+test('handleMessageCreate reports transcription failures and falls back to enqueueing original', async () => {
   let enqueued = 0;
   const replies: string[] = [];
   const reactions: string[] = [];
@@ -390,7 +391,7 @@ test('handleMessageCreate reports transcription failures and does not enqueue', 
     }) as any,
   );
 
-  assert.equal(enqueued, 0);
+  assert.equal(enqueued, 1, 'should enqueue original message as fallback on transcription error');
   assert.ok(reactions.includes('🎧'), 'should have 🎧 reaction even on failure');
   assert.ok(replies.some((r) => r.includes('Failed to transcribe this voice message')));
 });

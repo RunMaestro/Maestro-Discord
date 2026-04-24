@@ -2,7 +2,7 @@ import { Message, TextChannel, ThreadAutoArchiveDuration } from 'discord.js';
 import { escapeMarkdown } from '@discordjs/formatters';
 import { channelDb, threadDb } from '../db';
 import { enqueue } from '../services/queue';
-import { isVoiceAttachment, transcribeVoiceAttachment } from '../services/transcription';
+import { isVoiceAttachment, transcribeVoiceAttachment, isTranscriberAvailable } from '../services/transcription';
 import { splitMessage } from '../utils/splitMessage';
 
 type MessageCreateDeps = {
@@ -15,6 +15,7 @@ type MessageCreateDeps = {
   ) => void;
   isVoiceAttachment: typeof isVoiceAttachment;
   transcribeVoiceAttachment: typeof transcribeVoiceAttachment;
+  isTranscriberAvailable: typeof isTranscriberAvailable;
   splitMessage: typeof splitMessage;
   logger?: Pick<Console, 'warn' | 'error'>;
 };
@@ -124,6 +125,19 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       return;
     }
 
+    if (!deps.isTranscriberAvailable()) {
+      try {
+        await message.reply({
+          content: '⚠️ Voice transcription is currently unavailable (missing ffmpeg, whisper-cli, or model file). Message forwarded without transcription.',
+          allowedMentions: { parse: [] },
+        });
+      } catch {
+        // Reply may fail if permissions are missing
+      }
+      deps.enqueue(message);
+      return;
+    }
+
     let reaction: Awaited<ReturnType<typeof message.react>> | undefined;
     try {
       reaction = await message.react('🎧');
@@ -161,9 +175,12 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       }
 
       const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
+      const nonVoiceAttachments = [...message.attachments.values()].filter(
+        (attachment) => !deps.isVoiceAttachment(attachment),
+      );
       deps.enqueue(message, {
         contentOverride,
-        skipAttachments: true,
+        skipAttachments: nonVoiceAttachments.length === 0,
       });
     } catch (err) {
       try {
@@ -176,13 +193,14 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       log('messageCreate: failed to transcribe voice message:', err);
       try {
         await message.reply({
-          content: '❌ Failed to transcribe this voice message. Please confirm it is a valid .ogg voice message and that ffmpeg/whisper-cli are configured.',
+          content: '❌ Failed to transcribe this voice message. Message forwarded without transcription.',
           allowedMentions: { parse: [] },
         });
       } catch (replyErr) {
         const logErr = deps.logger?.error ?? console.error;
         logErr('messageCreate: failed to send transcription error reply:', replyErr);
       }
+      deps.enqueue(message);
     }
   };
 }
@@ -194,6 +212,7 @@ export const handleMessageCreate = createMessageCreateHandler({
   enqueue,
   isVoiceAttachment,
   transcribeVoiceAttachment,
+  isTranscriberAvailable,
   splitMessage,
   logger: console,
 });

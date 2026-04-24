@@ -1,12 +1,46 @@
 import { execFile } from 'child_process';
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, rm, writeFile } from 'fs/promises';
+import { mkdir, readFile, rm, writeFile, access } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 import type { Attachment } from 'discord.js';
 import { config } from '../config';
 import { logger } from './logger';
+
+let transcriberAvailable = false;
+
+export function isTranscriberAvailable(): boolean {
+  return transcriberAvailable;
+}
+
+export async function checkTranscriptionDependencies(): Promise<void> {
+  const checks = [
+    { name: 'ffmpeg', path: config.ffmpegPath },
+    { name: 'whisper-cli', path: config.whisperCliPath },
+    { name: 'whisper model', path: config.whisperModelPath },
+  ];
+
+  const missing: string[] = [];
+  for (const check of checks) {
+    try {
+      await access(check.path);
+    } catch {
+      missing.push(`${check.name} (${check.path})`);
+    }
+  }
+
+  if (missing.length > 0) {
+    console.warn(
+      `⚠️ Transcription disabled: missing dependencies: ${missing.join(', ')}. ` +
+      'Voice message transcription will be unavailable. See README for setup instructions.',
+    );
+    transcriberAvailable = false;
+  } else {
+    console.warn('✅ Voice transcription enabled.');
+    transcriberAvailable = true;
+  }
+}
 
 const execFileAsync = promisify(execFile);
 

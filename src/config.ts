@@ -43,6 +43,6 @@ export const config = {
     return process.env.WHISPER_CLI_PATH || 'whisper-cli';
   },
   get whisperModelPath() {
-    return process.env.WHISPER_MODEL_PATH || 'models/ggml-small.en.bin';
+    return process.env.WHISPER_MODEL_PATH || 'models/ggml-base.en.bin';
   },
 };
