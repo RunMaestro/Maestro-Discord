@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import { randomUUID } from 'crypto';
+import { constants } from 'fs';
 import { mkdir, readFile, rm, writeFile, access } from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -8,26 +9,64 @@ import type { Attachment } from 'discord.js';
 import { config } from '../config';
 import { logger } from './logger';
 
+const execFileAsync = promisify(execFile);
+
 let transcriberAvailable = false;
+let resolvedFfmpegPath: string | null = null;
+let resolvedWhisperCliPath: string | null = null;
+
+async function resolveExecutable(configPath: string, executableName: string): Promise<string> {
+  const isAbsolutePath = path.isAbsolute(configPath);
+
+  if (isAbsolutePath) {
+    // Validate explicit path is executable
+    await access(configPath, constants.X_OK);
+    return configPath;
+  }
+
+  // Bare command name: probe via execution to use OS PATH resolution
+  try {
+    await execFileAsync(configPath, ['--version'], { timeout: 5000 });
+    return configPath;
+  } catch {
+    throw new Error(`Could not resolve ${executableName} in PATH or as executable`);
+  }
+}
+
+export function getResolvedFfmpegPath(): string {
+  return resolvedFfmpegPath || config.ffmpegPath;
+}
+
+export function getResolvedWhisperCliPath(): string {
+  return resolvedWhisperCliPath || config.whisperCliPath;
+}
 
 export function isTranscriberAvailable(): boolean {
   return transcriberAvailable;
 }
 
 export async function checkTranscriptionDependencies(): Promise<void> {
-  const checks = [
-    { name: 'ffmpeg', path: config.ffmpegPath },
-    { name: 'whisper-cli', path: config.whisperCliPath },
-    { name: 'whisper model', path: config.whisperModelPath },
-  ];
-
   const missing: string[] = [];
-  for (const check of checks) {
-    try {
-      await access(check.path);
-    } catch {
-      missing.push(`${check.name} (${check.path})`);
-    }
+
+  // Check and resolve ffmpeg executable
+  try {
+    resolvedFfmpegPath = await resolveExecutable(config.ffmpegPath, 'ffmpeg');
+  } catch {
+    missing.push(`ffmpeg (${config.ffmpegPath})`);
+  }
+
+  // Check and resolve whisper-cli executable
+  try {
+    resolvedWhisperCliPath = await resolveExecutable(config.whisperCliPath, 'whisper-cli');
+  } catch {
+    missing.push(`whisper-cli (${config.whisperCliPath})`);
+  }
+
+  // Check whisper model file
+  try {
+    await access(config.whisperModelPath);
+  } catch {
+    missing.push(`whisper model (${config.whisperModelPath})`);
   }
 
   if (missing.length > 0) {
@@ -41,8 +80,6 @@ export async function checkTranscriptionDependencies(): Promise<void> {
     transcriberAvailable = true;
   }
 }
-
-const execFileAsync = promisify(execFile);
 
 async function runCommand(executable: string, args: string[]): Promise<void> {
   try {
@@ -81,7 +118,7 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
     const audioBuffer = Buffer.from(await response.arrayBuffer());
     await writeFile(inputPath, audioBuffer);
 
-    await runCommand(config.ffmpegPath, [
+    await runCommand(getResolvedFfmpegPath(), [
       '-y',
       '-i',
       inputPath,
@@ -94,7 +131,7 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
       wavPath,
     ]);
 
-    await runCommand(config.whisperCliPath, [
+    await runCommand(getResolvedWhisperCliPath(), [
       '-m',
       config.whisperModelPath,
       '-f',
