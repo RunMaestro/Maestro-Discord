@@ -26,10 +26,16 @@ async function resolveExecutable(configPath: string, executableName: string): Pr
 
   // Bare command name: probe via execution to use OS PATH resolution
   try {
-    await execFileAsync(configPath, ['--version'], { timeout: 5000 });
+    await execFileAsync(configPath, ['--help'], { timeout: 5000 });
     return configPath;
-  } catch {
-    throw new Error(`Could not resolve ${executableName} in PATH or as executable`);
+  } catch (err: unknown) {
+    const e = err as { code?: string; message?: string };
+    // Only fail if executable is truly missing or not executable
+    if (e.code === 'ENOENT' || e.code === 'EACCES') {
+      throw new Error(`Could not resolve ${executableName} in PATH or as executable`);
+    }
+    // If it ran but exited with non-zero, the executable exists
+    return configPath;
   }
 }
 
@@ -76,14 +82,14 @@ export async function checkTranscriptionDependencies(): Promise<void> {
     );
     transcriberAvailable = false;
   } else {
-    console.warn('✅ Voice transcription enabled.');
+    console.info('✅ Voice transcription enabled.');
     transcriberAvailable = true;
   }
 }
 
 async function runCommand(executable: string, args: string[]): Promise<void> {
   try {
-    await execFileAsync(executable, args);
+    await execFileAsync(executable, args, { timeout: 300000, killSignal: 'SIGKILL' });
   } catch (err: unknown) {
     const e = err as { message?: string; stderr?: string; stdout?: string; code?: number | string };
     const detail = [e.code ? `exit code: ${e.code}` : '', e.stderr?.trim(), e.stdout?.trim()]
