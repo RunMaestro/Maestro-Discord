@@ -97,6 +97,39 @@ npm run build
 npm start
 ```
 
+## Homebrew Service (Auto-start on boot)
+
+For macOS users who want the bot to start automatically when the computer boots:
+
+```bash
+# Run the automated setup script
+./scripts/setup-homebrew-service.sh
+```
+
+The setup script handles:
+- Creating environment configuration (`~/.config/maestro-discord.env`)
+- Building the project
+- Deploying Discord slash commands
+- Installing the Homebrew service
+
+Once installed, manage the service with:
+
+```bash
+# Start the service
+brew services start maestro-discord
+
+# Stop the service
+brew services stop maestro-discord
+
+# Check status
+brew services list
+
+# View logs
+tail -f /opt/homebrew/var/log/maestro-discord/output.log
+```
+
+For detailed setup instructions, see [docs/HOMEBREW_SETUP.md](docs/HOMEBREW_SETUP.md).
+
 ## Tests
 
 ```bash
