@@ -11,7 +11,7 @@ type MessageCreateDeps = {
   getBotUserId: (message: Message) => string | undefined;
   enqueue: (
     message: Message,
-    options?: { contentOverride?: string; skipAttachments?: boolean },
+    options?: { contentOverride?: string; attachmentsOverride?: Message['attachments'] },
   ) => void;
   isVoiceAttachment: typeof isVoiceAttachment;
   transcribeVoiceAttachment: typeof transcribeVoiceAttachment;
@@ -169,22 +169,22 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       }
 
       try {
-        await reaction?.remove();
+        await reaction?.users.remove(botUserId);
       } catch {
         // Ignore if already removed or no permission
       }
 
       const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
-      const nonVoiceAttachments = [...message.attachments.values()].filter(
+      const attachmentsOverride = message.attachments.filter(
         (attachment) => !deps.isVoiceAttachment(attachment),
       );
       deps.enqueue(message, {
         contentOverride,
-        skipAttachments: nonVoiceAttachments.length === 0,
+        attachmentsOverride,
       });
     } catch (err) {
       try {
-        await reaction?.remove();
+        await reaction?.users.remove(botUserId);
       } catch {
         // Ignore if already removed or no permission
       }

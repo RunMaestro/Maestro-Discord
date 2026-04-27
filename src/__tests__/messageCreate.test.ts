@@ -2,13 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMessageCreateHandler } from '../handlers/messageCreate';
 
+function makeAttachments(items: any[] = []) {
+  const filter = (predicate: (a: any) => boolean) => makeAttachments(items.filter(predicate));
+  return {
+    size: items.length,
+    values: () => items.values(),
+    filter,
+  };
+}
+
 function makeMessage(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     author: { bot: false, id: 'user-1', username: 'test-user' },
     member: { displayName: 'Test User' },
     guild: { id: 'guild-1' },
     content: 'hello',
-    attachments: { size: 0, values: () => [] },
+    attachments: makeAttachments(),
     mentions: { users: { has: () => false } },
     channel: {
       id: 'thread-1',
@@ -329,6 +338,7 @@ test('handleMessageCreate transcribes voice messages and enqueues transcription 
   const enqueueCalls: unknown[][] = [];
   const replies: string[] = [];
   const reactions: string[] = [];
+  const reactionUserRemovals: string[] = [];
   const deps = createDeps((...args: unknown[]) => {
     enqueueCalls.push(args);
   });
@@ -339,26 +349,109 @@ test('handleMessageCreate transcribes voice messages and enqueues transcription 
   await handler(
     makeMessage({
       content: '',
-      attachments: {
-        size: 1,
-        values: () => [{ url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' }],
-      },
+      attachments: makeAttachments([
+        { url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' },
+      ]),
       reply: async (msg: string | { content: string; allowedMentions?: unknown }) => {
         replies.push(typeof msg === 'string' ? msg : msg.content);
         return undefined;
       },
       react: async (emoji: string) => {
         reactions.push(emoji);
-        return { remove: async () => undefined };
+        return {
+          users: {
+            remove: async (userId: string) => {
+              reactionUserRemovals.push(userId);
+              return undefined;
+            },
+          },
+        };
       },
     }) as any,
   );
 
   assert.equal(enqueueCalls.length, 1);
   assert.equal((enqueueCalls[0][1] as any).contentOverride, 'hello from voice');
-  assert.equal((enqueueCalls[0][1] as any).skipAttachments, true);
+  assert.equal((enqueueCalls[0][1] as any).attachmentsOverride.size, 0);
   assert.ok(reactions.includes('🎧'), 'should have 🎧 reaction');
   assert.ok(replies.some((r) => r.includes('🎧')), 'should have 🎧 in transcription reply');
+  assert.deepEqual(
+    reactionUserRemovals,
+    ['bot-1'],
+    'should remove only the bots own reaction (not all users)',
+  );
+});
+
+test('handleMessageCreate preserves non-voice attachments when message mixes voice + files', async () => {
+  const enqueueCalls: unknown[][] = [];
+  const deps = createDeps((...args: unknown[]) => {
+    enqueueCalls.push(args);
+  });
+  const voice = { url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' };
+  const image = { url: 'https://cdn.discord.com/photo.png', name: 'photo.png' };
+  (deps as any).isVoiceAttachment = (a: any) => a.name.endsWith('.ogg');
+  deps.transcribeVoiceAttachment = async () => 'hello from voice';
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      content: 'see attached',
+      attachments: makeAttachments([voice, image]),
+      reply: async () => undefined,
+      react: async () => ({ users: { remove: async () => undefined } }),
+    }) as any,
+  );
+
+  assert.equal(enqueueCalls.length, 1);
+  const options = enqueueCalls[0][1] as any;
+  const overrideValues = [...options.attachmentsOverride.values()];
+  assert.equal(options.attachmentsOverride.size, 1, 'voice attachment should be filtered out');
+  assert.equal(overrideValues[0], image, 'non-voice attachment should be preserved for the agent');
+  assert.equal(
+    options.contentOverride,
+    'see attached\n\nhello from voice',
+    'content should combine original text with transcription',
+  );
+});
+
+test('handleMessageCreate forwards original message when transcriber dependencies are missing', async () => {
+  const enqueueCalls: unknown[][] = [];
+  const replies: string[] = [];
+  const reactions: string[] = [];
+  const deps = createDeps((...args: unknown[]) => {
+    enqueueCalls.push(args);
+  });
+  deps.isVoiceAttachment = () => true;
+  deps.isTranscriberAvailable = () => false;
+  deps.transcribeVoiceAttachment = async () => {
+    throw new Error('should not be called when transcriber is unavailable');
+  };
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      content: '',
+      attachments: makeAttachments([
+        { url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' },
+      ]),
+      reply: async (msg: string | { content: string; allowedMentions?: unknown }) => {
+        replies.push(typeof msg === 'string' ? msg : msg.content);
+        return undefined;
+      },
+      react: async (emoji: string) => {
+        reactions.push(emoji);
+        return { users: { remove: async () => undefined } };
+      },
+    }) as any,
+  );
+
+  assert.equal(enqueueCalls.length, 1, 'original message should be enqueued unchanged');
+  assert.equal(enqueueCalls[0].length, 1, 'no override options should be passed in fallback');
+  assert.equal(reactions.length, 0, 'no 🎧 reaction should be added when transcriber is unavailable');
+  assert.ok(
+    replies.some((r) => r.includes('Voice transcription is currently unavailable')),
+    'user should see the unavailability advisory',
+  );
 });
 
 test('handleMessageCreate reports transcription failures and falls back to enqueueing original', async () => {
@@ -376,17 +469,16 @@ test('handleMessageCreate reports transcription failures and falls back to enque
   const handler = createMessageCreateHandler(deps as any);
   await handler(
     makeMessage({
-      attachments: {
-        size: 1,
-        values: () => [{ url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' }],
-      },
+      attachments: makeAttachments([
+        { url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' },
+      ]),
       reply: async (msg: string | { content: string; allowedMentions?: unknown }) => {
         replies.push(typeof msg === 'string' ? msg : msg.content);
         return undefined;
       },
       react: async (emoji: string) => {
         reactions.push(emoji);
-        return { remove: async () => undefined };
+        return { users: { remove: async () => undefined } };
       },
     }) as any,
   );
