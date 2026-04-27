@@ -38,6 +38,7 @@ function createDeps(enqueue: (...args: any[]) => void) {
     },
     getBotUserId: () => 'bot-1',
     enqueue,
+    isVoiceMessage: () => true,
     isVoiceAttachment: () => false,
     transcribeVoiceAttachment: async () => '',
     isTranscriberAvailable: () => true,
@@ -452,6 +453,43 @@ test('handleMessageCreate forwards original message when transcriber dependencie
     replies.some((r) => r.includes('Voice transcription is currently unavailable')),
     'user should see the unavailability advisory',
   );
+});
+
+test('handleMessageCreate does not transcribe a bare .ogg upload without the voice-message flag', async () => {
+  const enqueueCalls: unknown[][] = [];
+  const reactions: string[] = [];
+  let transcribeCalled = false;
+  const deps = createDeps((...args: unknown[]) => {
+    enqueueCalls.push(args);
+  });
+  // The attachment looks like a voice file but the message lacks the
+  // IsVoiceMessage flag — a regular .ogg upload, not a Discord voice message.
+  deps.isVoiceMessage = () => false;
+  deps.isVoiceAttachment = () => true;
+  deps.transcribeVoiceAttachment = async () => {
+    transcribeCalled = true;
+    return 'should not happen';
+  };
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      content: 'here is some music',
+      attachments: makeAttachments([
+        { url: 'https://cdn.discord.com/song.ogg', name: 'song.ogg' },
+      ]),
+      reply: async () => undefined,
+      react: async (emoji: string) => {
+        reactions.push(emoji);
+        return { users: { remove: async () => undefined } };
+      },
+    }) as any,
+  );
+
+  assert.equal(transcribeCalled, false, 'transcriber should not run for non-voice messages');
+  assert.equal(reactions.length, 0, 'no 🎧 reaction for non-voice messages');
+  assert.equal(enqueueCalls.length, 1);
+  assert.equal(enqueueCalls[0].length, 1, 'should enqueue with no override options');
 });
 
 test('handleMessageCreate reports transcription failures and falls back to enqueueing original', async () => {
