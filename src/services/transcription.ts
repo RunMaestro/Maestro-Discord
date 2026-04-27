@@ -5,9 +5,16 @@ import { mkdir, readFile, rm, writeFile, access } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
-import type { Attachment } from 'discord.js';
+import { MessageFlags } from 'discord.js';
+import type { Attachment, Message } from 'discord.js';
 import { config } from '../config';
 import { logger } from './logger';
+
+// Hard cap on a single voice attachment's size before we attempt to download
+// and transcode it. Discord voice messages are short (≤ 10 min) and small in
+// practice; this keeps a stray oversized .ogg from blocking the per-channel
+// queue on a 5-minute ffmpeg/whisper run.
+export const MAX_VOICE_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
 
@@ -101,6 +108,10 @@ async function runCommand(executable: string, args: string[]): Promise<void> {
   }
 }
 
+export function isVoiceMessage(message: Pick<Message, 'flags'>): boolean {
+  return !!message.flags?.has(MessageFlags.IsVoiceMessage);
+}
+
 export function isVoiceAttachment(attachment: Attachment): boolean {
   const contentType = attachment.contentType?.toLowerCase() ?? '';
   const name = attachment.name.toLowerCase();
@@ -108,6 +119,12 @@ export function isVoiceAttachment(attachment: Attachment): boolean {
 }
 
 export async function transcribeVoiceAttachment(attachment: Attachment): Promise<string> {
+  if (typeof attachment.size === 'number' && attachment.size > MAX_VOICE_ATTACHMENT_BYTES) {
+    throw new Error(
+      `Voice attachment is ${attachment.size} bytes, exceeds limit of ${MAX_VOICE_ATTACHMENT_BYTES} bytes.`,
+    );
+  }
+
   const tempDir = path.join(os.tmpdir(), `maestro-discord-voice-${randomUUID()}`);
   const inputPath = path.join(tempDir, 'input.ogg');
   const wavPath = path.join(tempDir, 'input.wav');
@@ -146,7 +163,6 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
       '-of',
       outputBase,
     ]);
-
 
     const transcription = (await readFile(outputTxtPath, 'utf8')).trim();
     if (!transcription) {

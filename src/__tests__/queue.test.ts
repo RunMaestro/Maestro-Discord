@@ -286,7 +286,7 @@ test('queue uses contentOverride when provided', async () => {
   assert.equal(deps._mocks.send.mock.calls[0].arguments[1], 'transcribed text');
 });
 
-test('queue skips attachment downloads when skipAttachments is true', async () => {
+test('queue skips attachment downloads when attachmentsOverride is empty', async () => {
   const deps = createMockDeps();
   const { enqueue } = createQueue(deps);
   enqueue(
@@ -297,11 +297,60 @@ test('queue skips attachment downloads when skipAttachments is true', async () =
         values: () => [{ url: 'https://cdn.example.com/voice.ogg', name: 'voice.ogg', size: 100 }],
       },
     }),
-    { skipAttachments: true },
+    { attachmentsOverride: { size: 0, values: () => [] } as any },
   );
   await settle();
 
   assert.equal(deps._mocks.download.mock.callCount(), 0);
   assert.equal(deps._mocks.send.mock.callCount(), 1);
   assert.equal(deps._mocks.send.mock.calls[0].arguments[1], 'voice text');
+});
+
+test('queue downloads only the attachmentsOverride collection (drops voice in mixed messages)', async () => {
+  const deps = createMockDeps();
+  const downloadedFile = {
+    originalName: 'photo.png',
+    savedPath: '/home/agent/.maestro/discord-files/photo.png',
+  };
+  deps._mocks.download.mock.mockImplementation(async () => ({
+    downloaded: [downloadedFile],
+    failed: [],
+  }));
+  deps._mocks.format.mock.mockImplementation(() => `[Attached: ${downloadedFile.savedPath}]`);
+
+  const image = { url: 'https://cdn.example.com/photo.png', name: 'photo.png', size: 100 };
+  const overrideAttachments = { size: 1, values: () => [image] } as any;
+
+  const { enqueue } = createQueue(deps);
+  enqueue(
+    makeMessage({
+      content: 'see photo',
+      // The original message still carries both the voice file and the image…
+      attachments: {
+        size: 2,
+        values: () => [
+          { url: 'https://cdn.example.com/voice.ogg', name: 'voice.ogg', size: 100 },
+          image,
+        ],
+      },
+    }),
+    {
+      contentOverride: 'see photo\n\nhello from voice',
+      // …but only the non-voice subset is forwarded for download.
+      attachmentsOverride: overrideAttachments,
+    },
+  );
+  await settle();
+
+  assert.equal(deps._mocks.download.mock.callCount(), 1);
+  assert.equal(
+    deps._mocks.download.mock.calls[0].arguments[0],
+    overrideAttachments,
+    'queue should pass the override (image only), not the original mixed attachments, to downloadAttachments',
+  );
+  assert.equal(deps._mocks.send.mock.callCount(), 1);
+  assert.equal(
+    deps._mocks.send.mock.calls[0].arguments[1],
+    `see photo\n\nhello from voice\n\n[Attached: ${downloadedFile.savedPath}]`,
+  );
 });

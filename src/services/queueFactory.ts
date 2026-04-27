@@ -7,7 +7,7 @@ interface QueueEntry {
 
 export type EnqueueOptions = {
   contentOverride?: string;
-  skipAttachments?: boolean;
+  attachmentsOverride?: Message['attachments'];
 };
 
 export type QueueDeps = {
@@ -121,11 +121,12 @@ export function createQueue(deps: QueueDeps) {
     try {
       // Download attachments if present
       let attachmentRefs = '';
-      if (!options?.skipAttachments && message.attachments.size > 0) {
+      const attachmentsToProcess = options?.attachmentsOverride ?? message.attachments;
+      if (attachmentsToProcess.size > 0) {
         try {
           const agentCwd = await deps.maestro.getAgentCwd(agentId);
           if (agentCwd) {
-            const result = await deps.downloadAttachments(message.attachments, agentCwd);
+            const result = await deps.downloadAttachments(attachmentsToProcess, agentCwd);
             attachmentRefs = deps.formatAttachmentRefs(result.downloaded);
             if (result.failed.length > 0) {
               await channel.send(

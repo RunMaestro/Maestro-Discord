@@ -2,7 +2,12 @@ import { Message, TextChannel, ThreadAutoArchiveDuration } from 'discord.js';
 import { escapeMarkdown } from '@discordjs/formatters';
 import { channelDb, threadDb } from '../db';
 import { enqueue } from '../services/queue';
-import { isVoiceAttachment, transcribeVoiceAttachment, isTranscriberAvailable } from '../services/transcription';
+import {
+  isVoiceAttachment,
+  isVoiceMessage,
+  transcribeVoiceAttachment,
+  isTranscriberAvailable,
+} from '../services/transcription';
 import { splitMessage } from '../utils/splitMessage';
 
 type MessageCreateDeps = {
@@ -11,8 +16,9 @@ type MessageCreateDeps = {
   getBotUserId: (message: Message) => string | undefined;
   enqueue: (
     message: Message,
-    options?: { contentOverride?: string; skipAttachments?: boolean },
+    options?: { contentOverride?: string; attachmentsOverride?: Message['attachments'] },
   ) => void;
+  isVoiceMessage: typeof isVoiceMessage;
   isVoiceAttachment: typeof isVoiceAttachment;
   transcribeVoiceAttachment: typeof transcribeVoiceAttachment;
   isTranscriberAvailable: typeof isTranscriberAvailable;
@@ -117,6 +123,14 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
     const ownerUserId = threadInfo.owner_user_id?.trim();
     if (ownerUserId && ownerUserId !== message.author.id) return;
 
+    // Only treat the message as a voice message if Discord has tagged it with
+    // the IsVoiceMessage flag — a bare .ogg file upload should flow through
+    // the normal attachment path, not be transcribed.
+    if (!deps.isVoiceMessage(message)) {
+      deps.enqueue(message);
+      return;
+    }
+
     const voiceAttachments = [...message.attachments.values()].filter((attachment) =>
       deps.isVoiceAttachment(attachment),
     );
@@ -169,22 +183,22 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
       }
 
       try {
-        await reaction?.remove();
+        await reaction?.users.remove(botUserId);
       } catch {
         // Ignore if already removed or no permission
       }
 
       const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
-      const nonVoiceAttachments = [...message.attachments.values()].filter(
+      const attachmentsOverride = message.attachments.filter(
         (attachment) => !deps.isVoiceAttachment(attachment),
       );
       deps.enqueue(message, {
         contentOverride,
-        skipAttachments: nonVoiceAttachments.length === 0,
+        attachmentsOverride,
       });
     } catch (err) {
       try {
-        await reaction?.remove();
+        await reaction?.users.remove(botUserId);
       } catch {
         // Ignore if already removed or no permission
       }
@@ -210,6 +224,7 @@ export const handleMessageCreate = createMessageCreateHandler({
   threadDb,
   getBotUserId: (message) => message.client.user?.id,
   enqueue,
+  isVoiceMessage,
   isVoiceAttachment,
   transcribeVoiceAttachment,
   isTranscriberAvailable,
