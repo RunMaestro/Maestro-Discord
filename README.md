@@ -13,51 +13,47 @@ A Discord bot that connects your server to [Maestro](https://runmaestro.ai) AI a
 
 ## Prerequisites
 
-- Node.js 18+
+- Linux or macOS
+- Node.js 22+
 - A Discord application + bot token
-- [Maestro CLI](https://docs.runmaestro.ai/cli) available on your `PATH` (no authentication required)
+- [Maestro CLI](https://docs.runmaestro.ai/cli) on your `PATH`
 
-### Install maestro-discord CLI
+## Install (production)
 
-The `maestro-discord` CLI lets your Maestro agents reach out to you on Discord — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
-
-After building the project (`npm run build`), create a shell wrapper.
-
-macOS / Linux:
+One command — downloads the latest tagged release, installs dependencies, prompts for Discord credentials, and registers a user-level service.
 
 ```bash
-printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
+curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Discord/main/install.sh | bash
 ```
 
-Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user `PATH`:
-
-```powershell
-$repoPath = (Get-Location).Path
-$binDir = "$env:USERPROFILE\bin"
-New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-@"
-@echo off
-node "$repoPath\dist\cli\maestro-discord.js" %*
-"@ | Out-File -FilePath "$binDir\maestro-discord.cmd" -Encoding ASCII
-
-# Add $binDir to user PATH if it isn't already (restart your shell afterwards)
-$userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
-if (-not ($userPath -split ';' -contains $binDir)) {
-    [Environment]::SetEnvironmentVariable('PATH', "$binDir;$userPath", 'User')
-}
-```
-
-Or use `npm link`:
+After install:
 
 ```bash
-npm link
+maestro-discord-ctl start     # boot the bot
+maestro-discord-ctl logs      # tail logs
+maestro-discord-ctl status    # service status
+maestro-discord-ctl update    # upgrade to latest release (preserves config)
+maestro-discord-ctl uninstall # remove install + service files
 ```
 
-## Quick start
+Defaults:
 
-1. Install dependencies:
+| Path                          | Purpose                                  |
+| ----------------------------- | ---------------------------------------- |
+| `~/.local/share/maestro-discord/` | Installed bot (built JS + dependencies) |
+| `~/.config/maestro-discord/.env`  | Configuration (preserved across updates) |
+| `~/.local/bin/maestro-discord-ctl` | Service control wrapper             |
+| systemd user / launchd agent  | Auto-start unit                          |
+
+Override any of these with `MAESTRO_DISCORD_HOME`, `XDG_CONFIG_HOME`, or `MAESTRO_DISCORD_BIN_DIR`. Pin a specific version with `MAESTRO_DISCORD_VERSION=v1.0.0`.
+
+## Install (development from source)
+
+1. Clone and install:
 
 ```bash
+git clone https://github.com/RunMaestro/Maestro-Discord.git
+cd Maestro-Discord
 npm install
 ```
 
@@ -91,6 +87,42 @@ npm run deploy-commands
 
 ```bash
 npm run dev
+```
+
+### Install maestro-discord CLI (dev)
+
+The `maestro-discord` CLI lets your Maestro agents reach out to you on Discord — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
+
+After building the project (`npm run build`), create a shell wrapper.
+
+macOS / Linux:
+
+```bash
+printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
+```
+
+Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user `PATH`:
+
+```powershell
+$repoPath = (Get-Location).Path
+$binDir = "$env:USERPROFILE\bin"
+New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+@"
+@echo off
+node "$repoPath\dist\cli\maestro-discord.js" %*
+"@ | Out-File -FilePath "$binDir\maestro-discord.cmd" -Encoding ASCII
+
+# Add $binDir to user PATH if it isn't already (restart your shell afterwards)
+$userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+if (-not ($userPath -split ';' -contains $binDir)) {
+    [Environment]::SetEnvironmentVariable('PATH', "$binDir;$userPath", 'User')
+}
+```
+
+Or use `npm link`:
+
+```bash
+npm link
 ```
 
 ## Voice Transcription (optional)
@@ -131,13 +163,6 @@ WHISPER_MODEL_PATH=models/ggml-base.en.bin
 ```
 
 The bot probes these at startup; any missing piece is logged as `⚠️ Transcription disabled: …` and transcription is skipped at runtime.
-
-## Production run
-
-```bash
-npm run build
-npm start
-```
 
 ## Tests
 
