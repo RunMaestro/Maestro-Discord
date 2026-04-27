@@ -81,34 +81,56 @@ WHISPER_CLI_PATH=/opt/homebrew/bin/whisper-cli      # Optional: path to whisper-
 WHISPER_MODEL_PATH=models/ggml-base.en.bin          # Optional: path to whisper.cpp model
 ```
 
-### Voice Transcription Setup
+3. Deploy slash commands:
 
-To enable voice message transcription, you need [ffmpeg](https://ffmpeg.org/) and [whisper-cli](https://github.com/ggerganov/whisper.cpp) (from [FM pack](https://www.whisk.ai/fm-pack-whisper-cpp)). Both projects are cross-platform and work on macOS, Linux, and Windows.
+```bash
+npm run deploy-commands
+```
 
-1. Install ffmpeg and whisper-cli (e.g., via Homebrew on macOS):
+4. Start the bot (dev mode):
+
+```bash
+npm run dev
+```
+
+## Voice Transcription (optional)
+
+When a user posts a Discord **voice message** (the mic-button recording, not an arbitrary `.ogg` upload) in a session thread, the bot transcribes the audio with `whisper.cpp` and forwards the transcript to the agent. The original `.ogg` is **not** sent to the agent — only the transcribed text — and a `🎧` reaction marks the message while transcription runs.
+
+If the dependencies below are missing, the bot starts normally and voice messages are forwarded as plain attachments with a one-line advisory; no other functionality is affected.
+
+**Behavior notes:**
+
+- Only messages flagged `IsVoiceMessage` by Discord are transcribed. Bare `.ogg` file uploads are routed through the normal attachment path.
+- Voice attachments larger than 25 MB are rejected up-front (the per-channel queue would otherwise be blocked for several minutes of ffmpeg/whisper work).
+- Mixed messages (voice + image/file) are supported: the transcription is forwarded as text and the non-voice attachments are downloaded for the agent as usual.
+
+### Installation
+
+1. Install [ffmpeg](https://ffmpeg.org/) and [whisper-cli](https://github.com/ggerganov/whisper.cpp). On macOS via Homebrew:
 
 ```bash
 brew install ffmpeg whisper-cli
 ```
 
-3. Download the whisper model (optional if using the default model path):
+On Linux / Windows, install ffmpeg via your package manager and build `whisper-cli` from the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo, or use [Linuxbrew](https://docs.brew.sh/Homebrew-on-Linux).
+
+2. Download a whisper model (skip if you already have one at the configured path):
 
 ```bash
 mkdir -p ./models
 curl -L -o models/ggml-base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
 ```
 
-4. Deploy slash commands:
+3. (Optional) Override the binary or model paths in `.env` if they're not on `PATH` or the default location:
 
 ```bash
-npm run deploy-commands
+FFMPEG_PATH=/opt/homebrew/bin/ffmpeg
+WHISPER_CLI_PATH=/opt/homebrew/bin/whisper-cli
+WHISPER_MODEL_PATH=models/ggml-base.en.bin
 ```
 
-5. Start the bot (dev mode):
-
-```bash
-npm run dev
-```
+The bot probes these at startup; any missing piece is logged as `⚠️ Transcription disabled: …` and transcription is skipped at runtime.
 
 ## Production run
 
