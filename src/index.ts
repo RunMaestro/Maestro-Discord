@@ -4,6 +4,7 @@ import * as health from './commands/health';
 import * as agents from './commands/agents';
 import * as session from './commands/session';
 import './db'; // ensure DB is initialized on startup
+import { checkTranscriptionDependencies } from './services/transcription';
 import { handleMessageCreate } from './handlers/messageCreate';
 import { startServer } from './server';
 
@@ -23,8 +24,9 @@ const client = new Client({
 
 let server: ReturnType<typeof startServer> | null = null;
 
-client.once('ready', (c) => {
+client.once('ready', async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  await checkTranscriptionDependencies();
   server = startServer(client);
 });
 

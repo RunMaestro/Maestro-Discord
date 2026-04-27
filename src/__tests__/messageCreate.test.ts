@@ -13,7 +13,9 @@ function makeMessage(overrides: Partial<Record<string, unknown>> = {}) {
     channel: {
       id: 'thread-1',
       isThread: () => true,
+      sendTyping: async () => undefined,
     },
+    reply: async () => undefined,
     ...overrides,
   } as unknown;
 }
@@ -27,6 +29,10 @@ function createDeps(enqueue: (...args: any[]) => void) {
     },
     getBotUserId: () => 'bot-1',
     enqueue,
+    isVoiceAttachment: () => false,
+    transcribeVoiceAttachment: async () => '',
+    isTranscriberAvailable: () => true,
+    splitMessage: (text: string) => [text],
   };
 }
 
@@ -317,4 +323,75 @@ test('handleMessageCreate ignores non-thread channel messages without bot mentio
   );
 
   assert.equal(created, 0);
+});
+
+test('handleMessageCreate transcribes voice messages and enqueues transcription text', async () => {
+  const enqueueCalls: unknown[][] = [];
+  const replies: string[] = [];
+  const reactions: string[] = [];
+  const deps = createDeps((...args: unknown[]) => {
+    enqueueCalls.push(args);
+  });
+  deps.isVoiceAttachment = () => true;
+  deps.transcribeVoiceAttachment = async () => 'hello from voice';
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      content: '',
+      attachments: {
+        size: 1,
+        values: () => [{ url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' }],
+      },
+      reply: async (msg: string | { content: string; allowedMentions?: unknown }) => {
+        replies.push(typeof msg === 'string' ? msg : msg.content);
+        return undefined;
+      },
+      react: async (emoji: string) => {
+        reactions.push(emoji);
+        return { remove: async () => undefined };
+      },
+    }) as any,
+  );
+
+  assert.equal(enqueueCalls.length, 1);
+  assert.equal((enqueueCalls[0][1] as any).contentOverride, 'hello from voice');
+  assert.equal((enqueueCalls[0][1] as any).skipAttachments, true);
+  assert.ok(reactions.includes('🎧'), 'should have 🎧 reaction');
+  assert.ok(replies.some((r) => r.includes('🎧')), 'should have 🎧 in transcription reply');
+});
+
+test('handleMessageCreate reports transcription failures and falls back to enqueueing original', async () => {
+  let enqueued = 0;
+  const replies: string[] = [];
+  const reactions: string[] = [];
+  const deps = createDeps(() => {
+    enqueued += 1;
+  });
+  deps.isVoiceAttachment = () => true;
+  deps.transcribeVoiceAttachment = async () => {
+    throw new Error('boom');
+  };
+
+  const handler = createMessageCreateHandler(deps as any);
+  await handler(
+    makeMessage({
+      attachments: {
+        size: 1,
+        values: () => [{ url: 'https://cdn.discord.com/voice.ogg', name: 'voice.ogg' }],
+      },
+      reply: async (msg: string | { content: string; allowedMentions?: unknown }) => {
+        replies.push(typeof msg === 'string' ? msg : msg.content);
+        return undefined;
+      },
+      react: async (emoji: string) => {
+        reactions.push(emoji);
+        return { remove: async () => undefined };
+      },
+    }) as any,
+  );
+
+  assert.equal(enqueued, 1, 'should enqueue original message as fallback on transcription error');
+  assert.ok(reactions.includes('🎧'), 'should have 🎧 reaction even on failure');
+  assert.ok(replies.some((r) => r.includes('Failed to transcribe this voice message')));
 });

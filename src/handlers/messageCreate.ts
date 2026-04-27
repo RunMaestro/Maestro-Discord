@@ -1,12 +1,22 @@
 import { Message, TextChannel, ThreadAutoArchiveDuration } from 'discord.js';
+import { escapeMarkdown } from '@discordjs/formatters';
 import { channelDb, threadDb } from '../db';
 import { enqueue } from '../services/queue';
+import { isVoiceAttachment, transcribeVoiceAttachment, isTranscriberAvailable } from '../services/transcription';
+import { splitMessage } from '../utils/splitMessage';
 
 type MessageCreateDeps = {
   channelDb: Pick<typeof channelDb, 'get'>;
   threadDb: Pick<typeof threadDb, 'get' | 'register'>;
   getBotUserId: (message: Message) => string | undefined;
-  enqueue: (message: Message) => void;
+  enqueue: (
+    message: Message,
+    options?: { contentOverride?: string; skipAttachments?: boolean },
+  ) => void;
+  isVoiceAttachment: typeof isVoiceAttachment;
+  transcribeVoiceAttachment: typeof transcribeVoiceAttachment;
+  isTranscriberAvailable: typeof isTranscriberAvailable;
+  splitMessage: typeof splitMessage;
   logger?: Pick<Console, 'warn' | 'error'>;
 };
 
@@ -107,7 +117,91 @@ export function createMessageCreateHandler(deps: MessageCreateDeps) {
     const ownerUserId = threadInfo.owner_user_id?.trim();
     if (ownerUserId && ownerUserId !== message.author.id) return;
 
-    deps.enqueue(message);
+    const voiceAttachments = [...message.attachments.values()].filter((attachment) =>
+      deps.isVoiceAttachment(attachment),
+    );
+    if (voiceAttachments.length === 0) {
+      deps.enqueue(message);
+      return;
+    }
+
+    if (!deps.isTranscriberAvailable()) {
+      try {
+        await message.reply({
+          content: '⚠️ Voice transcription is currently unavailable (missing ffmpeg, whisper-cli, or model file). Message forwarded without transcription.',
+          allowedMentions: { parse: [] },
+        });
+      } catch {
+        // Reply may fail if permissions are missing
+      }
+      deps.enqueue(message);
+      return;
+    }
+
+    let reaction: Awaited<ReturnType<typeof message.react>> | undefined;
+    try {
+      reaction = await message.react('🎧');
+    } catch {
+      // Reaction may fail if message was deleted or bot lacks perms; continue anyway
+    }
+
+    try {
+      const transcriptions: string[] = [];
+      for (const attachment of voiceAttachments) {
+        const transcription = await deps.transcribeVoiceAttachment(attachment);
+        transcriptions.push(
+          voiceAttachments.length === 1
+            ? transcription
+            : `**${escapeMarkdown(attachment.name)}**\n${transcription}`,
+        );
+      }
+
+      const transcriptionText = transcriptions.join('\n\n');
+      const replyResults = await Promise.allSettled(
+        deps
+          .splitMessage(`🎧 ${transcriptionText}`)
+          .map((part) => message.reply({ content: part, allowedMentions: { parse: [] } })),
+      );
+      const failedReplies = replyResults.filter((result) => result.status === 'rejected');
+      if (failedReplies.length > 0) {
+        const logWarn = deps.logger?.warn ?? console.warn;
+        logWarn(`messageCreate: failed to send ${failedReplies.length} transcription reply part(s)`);
+      }
+
+      try {
+        await reaction?.remove();
+      } catch {
+        // Ignore if already removed or no permission
+      }
+
+      const contentOverride = [message.content.trim(), transcriptionText].filter(Boolean).join('\n\n');
+      const nonVoiceAttachments = [...message.attachments.values()].filter(
+        (attachment) => !deps.isVoiceAttachment(attachment),
+      );
+      deps.enqueue(message, {
+        contentOverride,
+        skipAttachments: nonVoiceAttachments.length === 0,
+      });
+    } catch (err) {
+      try {
+        await reaction?.remove();
+      } catch {
+        // Ignore if already removed or no permission
+      }
+
+      const log = deps.logger?.error ?? console.error;
+      log('messageCreate: failed to transcribe voice message:', err);
+      try {
+        await message.reply({
+          content: '❌ Failed to transcribe this voice message. Message forwarded without transcription.',
+          allowedMentions: { parse: [] },
+        });
+      } catch (replyErr) {
+        const logErr = deps.logger?.error ?? console.error;
+        logErr('messageCreate: failed to send transcription error reply:', replyErr);
+      }
+      deps.enqueue(message);
+    }
   };
 }
 
@@ -116,5 +210,9 @@ export const handleMessageCreate = createMessageCreateHandler({
   threadDb,
   getBotUserId: (message) => message.client.user?.id,
   enqueue,
+  isVoiceAttachment,
+  transcribeVoiceAttachment,
+  isTranscriberAvailable,
+  splitMessage,
   logger: console,
 });

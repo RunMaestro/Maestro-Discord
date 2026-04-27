@@ -2,7 +2,13 @@ import { Message, TextChannel, ThreadChannel } from 'discord.js';
 
 interface QueueEntry {
   message: Message;
+  options?: EnqueueOptions;
 }
+
+export type EnqueueOptions = {
+  contentOverride?: string;
+  skipAttachments?: boolean;
+};
 
 export type QueueDeps = {
   maestro: {
@@ -62,10 +68,10 @@ export function createQueue(deps: QueueDeps) {
   const queues = new Map<string, QueueEntry[]>();
   const processing = new Set<string>();
 
-  function enqueue(message: Message): void {
+  function enqueue(message: Message, options?: EnqueueOptions): void {
     const channelId = message.channel.id;
     if (!queues.has(channelId)) queues.set(channelId, []);
-    queues.get(channelId)!.push({ message });
+    queues.get(channelId)!.push({ message, options });
 
     if (!processing.has(channelId)) {
       void processNext(channelId);
@@ -80,7 +86,7 @@ export function createQueue(deps: QueueDeps) {
     }
 
     processing.add(channelId);
-    const { message } = queue.shift()!;
+    const { message, options } = queue.shift()!;
 
     const isThread = message.channel.isThread();
     const threadInfo = isThread ? deps.threadDb.get(channelId) : undefined;
@@ -115,7 +121,7 @@ export function createQueue(deps: QueueDeps) {
     try {
       // Download attachments if present
       let attachmentRefs = '';
-      if (message.attachments.size > 0) {
+      if (!options?.skipAttachments && message.attachments.size > 0) {
         try {
           const agentCwd = await deps.maestro.getAgentCwd(agentId);
           if (agentCwd) {
@@ -140,7 +146,9 @@ export function createQueue(deps: QueueDeps) {
       }
 
       const readOnly = !!channelInfo.read_only;
-      const fullMessage = [message.content, attachmentRefs].filter(Boolean).join('\n\n');
+      const fullMessage = [options?.contentOverride ?? message.content, attachmentRefs]
+        .filter(Boolean)
+        .join('\n\n');
       const result = await deps.maestro.send(agentId, fullMessage, sessionId, readOnly);
 
       // Persist session ID from first response

@@ -76,15 +76,35 @@ DISCORD_GUILD_ID=    # Your server's ID (right-click server → Copy ID)
 DISCORD_ALLOWED_USER_IDS=123,456  # Optional: comma-separated user IDs allowed to run slash commands
 API_PORT=3457                     # Optional: port for internal API (default 3457)
 DISCORD_MENTION_USER_ID=          # Optional: Discord user ID to @mention when --mention is used
+FFMPEG_PATH=/opt/homebrew/bin/ffmpeg                # Optional: path to ffmpeg binary
+WHISPER_CLI_PATH=/opt/homebrew/bin/whisper-cli      # Optional: path to whisper-cli binary
+WHISPER_MODEL_PATH=models/ggml-base.en.bin          # Optional: path to whisper.cpp model
 ```
 
-3. Deploy slash commands:
+### Voice Transcription Setup
+
+To enable voice message transcription, you need [ffmpeg](https://ffmpeg.org/) and [whisper-cli](https://github.com/ggerganov/whisper.cpp) (from [FM pack](https://www.whisk.ai/fm-pack-whisper-cpp)). Both projects are cross-platform and work on macOS, Linux, and Windows.
+
+1. Install ffmpeg and whisper-cli (e.g., via Homebrew on macOS):
+
+```bash
+brew install ffmpeg whisper-cli
+```
+
+3. Download the whisper model (optional if using the default model path):
+
+```bash
+mkdir -p ./models
+curl -L -o models/ggml-base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+```
+
+4. Deploy slash commands:
 
 ```bash
 npm run deploy-commands
 ```
 
-4. Start the bot (dev mode):
+5. Start the bot (dev mode):
 
 ```bash
 npm run dev
