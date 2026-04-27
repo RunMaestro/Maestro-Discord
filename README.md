@@ -159,16 +159,18 @@ Delete this file to reset all channel bindings.
 Invite the bot with both `bot` and `applications.commands` scopes:
 
 ```text
-https://discord.com/oauth2/authorize?client_id=<DISCORD_CLIENT_ID>&scope=bot+applications.commands&permissions=11344
+https://discord.com/oauth2/authorize?client_id=<DISCORD_CLIENT_ID>&scope=bot+applications.commands&permissions=309237681232
 ```
 
 This grants the following permissions:
 
-- Manage Channels
-- Add Reactions
+- Manage Channels — create and delete agent channels (`/agents new`, `/agents disconnect`)
 - View Channels
 - Send Messages
-- Manage Messages
+- Attach Files — re-upload user attachments when forwarding to a session thread
+- Add Reactions — `⏳`/`🎧` queue and transcription indicators
+- Create Public Threads — owner-bound session threads
+- Send Messages in Threads
 
 Then enable **Message Content Intent** under Privileged Gateway Intents at:
 
