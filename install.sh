@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Discord/main/install.sh | bash
 # Re-run to upgrade to the latest release. Existing config is preserved.
 
-set -euo pipefail
+set -Eeuo pipefail
 
 REPO="${MAESTRO_DISCORD_REPO:-RunMaestro/Maestro-Discord}"
 INSTALL_DIR="${MAESTRO_DISCORD_HOME:-$HOME/.local/share/maestro-discord}"
@@ -12,6 +12,15 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maestro-discord"
 BIN_DIR="${MAESTRO_DISCORD_BIN_DIR:-$HOME/.local/bin}"
 VERSION="${MAESTRO_DISCORD_VERSION:-latest}"
 NODE_MIN_MAJOR=22
+RELEASE_BACKUP=""
+
+rollback_install() {
+  if [ -n "$RELEASE_BACKUP" ] && [ -d "$RELEASE_BACKUP" ]; then
+    rm -rf "$INSTALL_DIR"
+    mv "$RELEASE_BACKUP" "$INSTALL_DIR"
+    warn "Restored previous install from $RELEASE_BACKUP"
+  fi
+}
 
 c_red()    { printf '\033[31m%s\033[0m' "$*"; }
 c_green()  { printf '\033[32m%s\033[0m' "$*"; }
@@ -68,11 +77,43 @@ resolve_release() {
   echo "$tag"
 }
 
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    return 1
+  fi
+}
+
 download_release() {
   local tag="$1" dest="$2"
   local url="https://github.com/${REPO}/releases/download/${tag}/maestro-discord-${tag}.tar.gz"
+  local sha_url="${url}.sha256"
   info "Downloading ${tag} from ${url}"
   curl -fsSL "$url" -o "$dest" || die "Download failed: $url"
+
+  local sha_file expected actual
+  sha_file="$(mktemp)"
+  if curl -fsSL "$sha_url" -o "$sha_file" 2>/dev/null; then
+    expected="$(awk '{print $1}' "$sha_file")"
+    rm -f "$sha_file"
+    if [ -z "$expected" ]; then
+      die "Empty checksum at $sha_url"
+    fi
+    if ! actual="$(sha256_of "$dest")"; then
+      warn "No sha256sum/shasum on PATH — skipping checksum verification"
+      return
+    fi
+    if [ "$expected" != "$actual" ]; then
+      die "Checksum mismatch for $url (expected $expected, got $actual)"
+    fi
+    ok "Verified SHA-256 checksum"
+  else
+    rm -f "$sha_file"
+    warn "Checksum file not published at $sha_url — skipping verification"
+  fi
 }
 
 install_release() {
@@ -86,24 +127,21 @@ install_release() {
   [ -n "$extracted" ] || extracted="$staging"
 
   mkdir -p "$INSTALL_DIR"
-  local backup=""
   if [ -d "$INSTALL_DIR/dist" ]; then
-    backup="${INSTALL_DIR}.backup.$(date +%s)"
-    mv "$INSTALL_DIR" "$backup"
+    RELEASE_BACKUP="${INSTALL_DIR}.backup.$(date +%s)"
+    mv "$INSTALL_DIR" "$RELEASE_BACKUP"
     mkdir -p "$INSTALL_DIR"
-    trap 'rm -rf "$INSTALL_DIR"; mv "$backup" "$INSTALL_DIR"; warn "Restored previous install from $backup"' ERR
-    info "Backed up previous install to $backup"
+    info "Backed up previous install to $RELEASE_BACKUP"
   fi
 
   cp -R "$extracted"/. "$INSTALL_DIR"/
   printf '%s\n' "$tag" > "$INSTALL_DIR/.version"
 
-  if [ -n "$backup" ] && [ -f "$backup/maestro-bot.db" ] && [ ! -f "$INSTALL_DIR/maestro-bot.db" ]; then
-    cp "$backup/maestro-bot.db" "$INSTALL_DIR/maestro-bot.db"
+  if [ -n "$RELEASE_BACKUP" ] && [ -f "$RELEASE_BACKUP/maestro-bot.db" ] && [ ! -f "$INSTALL_DIR/maestro-bot.db" ]; then
+    cp "$RELEASE_BACKUP/maestro-bot.db" "$INSTALL_DIR/maestro-bot.db"
     info "Preserved SQLite database"
   fi
 
-  trap - ERR
   ok "Extracted release to $INSTALL_DIR"
 }
 
@@ -142,6 +180,7 @@ write_config() {
   if [ ! -r /dev/tty ]; then
     info "Non-interactive shell — writing template to $env_file (edit before starting)"
     cp "$INSTALL_DIR/.env.example" "$env_file"
+    chmod 600 "$env_file"
     ln -sf "$env_file" "$INSTALL_DIR/.env"
     return
   fi
@@ -225,6 +264,7 @@ install_service_macos() {
   [ -f "$template" ] || { warn "Plist template missing at $template"; return; }
   sed \
     -e "s|@INSTALL_DIR@|$INSTALL_DIR|g" \
+    -e "s|@CONFIG_DIR@|$CONFIG_DIR|g" \
     -e "s|@NODE_BIN@|$(command -v node)|g" \
     "$template" > "$plist_dir/sh.maestro.discord.plist"
   ok "Installed launchd plist → $plist_dir/sh.maestro.discord.plist"
@@ -256,8 +296,10 @@ main() {
   tarball="$(mktemp)"
   trap 'rm -f "$tarball"' EXIT
   download_release "$tag" "$tarball"
+  trap 'rollback_install' ERR
   install_release "$tag" "$tarball"
   install_deps
+  trap - ERR
   install_ctl
   write_config
   deploy_commands

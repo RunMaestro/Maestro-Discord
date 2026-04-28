@@ -8,8 +8,9 @@
   <string>@INSTALL_DIR@</string>
   <key>ProgramArguments</key>
   <array>
-    <string>@NODE_BIN@</string>
-    <string>@INSTALL_DIR@/dist/index.js</string>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>set -a; . "@CONFIG_DIR@/.env"; set +a; exec "@NODE_BIN@" "@INSTALL_DIR@/dist/index.js"</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

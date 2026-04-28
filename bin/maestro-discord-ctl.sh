@@ -115,7 +115,17 @@ cmd_deploy() {
 
 cmd_update() {
   info "Re-running installer to pull the latest release"
-  curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/install.sh" | bash
+  local tag config_parent
+  tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n1)"
+  [ -n "$tag" ] || die "Could not resolve latest release tag"
+  config_parent="${CONFIG_DIR%/maestro-discord}"
+  curl -fsSL "https://raw.githubusercontent.com/${REPO}/${tag}/install.sh" \
+    | env \
+        MAESTRO_DISCORD_HOME="$INSTALL_DIR" \
+        MAESTRO_DISCORD_BIN_DIR="$BIN_DIR" \
+        MAESTRO_DISCORD_REPO="$REPO" \
+        XDG_CONFIG_HOME="$config_parent" \
+        bash
 }
 
 cmd_uninstall() {
