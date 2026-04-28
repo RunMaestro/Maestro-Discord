@@ -6,6 +6,7 @@ set -euo pipefail
 
 INSTALL_DIR="${MAESTRO_DISCORD_HOME:-$HOME/.local/share/maestro-discord}"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maestro-discord"
+BIN_DIR="${MAESTRO_DISCORD_BIN_DIR:-$HOME/.local/bin}"
 REPO="${MAESTRO_DISCORD_REPO:-RunMaestro/Maestro-Discord}"
 SERVICE_NAME="maestro-discord"
 LAUNCHD_LABEL="sh.maestro.discord"
@@ -98,7 +99,8 @@ cmd_logs() {
     linux) journalctl --user -u "$SERVICE_NAME" -f --no-pager ;;
     macos)
       local log_file="$INSTALL_DIR/logs/maestro-discord.log"
-      [ -f "$log_file" ] || die "Log file not found: $log_file"
+      mkdir -p "$INSTALL_DIR/logs"
+      [ -f "$log_file" ] || touch "$log_file"
       tail -f "$log_file"
       ;;
     *) die "Unsupported OS for log tailing" ;;
@@ -125,13 +127,15 @@ cmd_uninstall() {
   cmd_stop || true
   case "$(detect_os)" in
     linux)
+      systemctl --user disable --now "$SERVICE_NAME" 2>/dev/null || true
       rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${SERVICE_NAME}.service"
       systemctl --user daemon-reload || true
+      systemctl --user reset-failed "$SERVICE_NAME" 2>/dev/null || true
       ;;
     macos) rm -f "$LAUNCHD_PLIST" ;;
   esac
   rm -rf "$INSTALL_DIR"
-  rm -f "$HOME/.local/bin/maestro-discord-ctl"
+  rm -f "$BIN_DIR/maestro-discord-ctl"
   info "Uninstalled. Config preserved at $CONFIG_DIR (delete manually if desired)."
 }
 

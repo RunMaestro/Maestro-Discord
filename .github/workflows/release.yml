@@ -50,7 +50,8 @@ jobs:
           mkdir -p "$staging"
           cp -R dist "$staging/"
           cp -R bin templates "$staging/"
-          cp package.json package-lock.json .env.example README.md LICENSE "$staging/" 2>/dev/null || true
+          cp package.json package-lock.json .env.example README.md "$staging/"
+          cp LICENSE "$staging/" 2>/dev/null || true
           tar -czf "${staging}.tar.gz" "$staging"
           sha256sum "${staging}.tar.gz" > "${staging}.tar.gz.sha256"
           echo "tarball=${staging}.tar.gz" >> "$GITHUB_OUTPUT"
