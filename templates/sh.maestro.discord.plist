@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>sh.maestro.discord</string>
+  <key>WorkingDirectory</key>
+  <string>@INSTALL_DIR@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>set -a; . "@CONFIG_DIR@/.env"; set +a; exec "@NODE_BIN@" "@INSTALL_DIR@/dist/index.js"</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>@INSTALL_DIR@/logs/maestro-discord.log</string>
+  <key>StandardErrorPath</key>
+  <string>@INSTALL_DIR@/logs/maestro-discord.log</string>
+</dict>
+</plist>
