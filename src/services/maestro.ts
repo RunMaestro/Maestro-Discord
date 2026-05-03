@@ -55,6 +55,63 @@ export interface MaestroPlaybook {
   [key: string]: unknown;
 }
 
+export interface MaestroAgentDetail extends MaestroAgent {
+  projectRoot?: string;
+  groupName?: string;
+  autoRunFolderPath?: string;
+  stats?: {
+    historyEntries?: number;
+    successCount?: number;
+    failureCount?: number;
+    totalInputTokens?: number;
+    totalOutputTokens?: number;
+    totalCost?: number;
+    totalElapsedMs?: number;
+  };
+  recentHistory?: Array<{
+    id: string;
+    type: string;
+    timestamp: number;
+    summary: string;
+    success?: boolean;
+    elapsedTimeMs?: number;
+  }>;
+}
+
+export interface GistResult {
+  url: string;
+  id: string;
+  [key: string]: unknown;
+}
+
+export interface DirectorNotesEntry {
+  id?: string;
+  type?: string;
+  timestamp?: number;
+  summary?: string;
+  agentName?: string;
+  success?: boolean;
+  [key: string]: unknown;
+}
+
+export interface DirectorSynopsis {
+  synopsis?: string;
+  text?: string;
+  markdown?: string;
+  daysCovered?: number;
+  entriesAnalyzed?: number;
+  [key: string]: unknown;
+}
+
+export interface AutoRunOptions {
+  agentId: string;
+  docs: string[];
+  prompt?: string;
+  loop?: boolean;
+  maxLoops?: number;
+  resetOnCompletion?: boolean;
+}
+
 export interface MaestroPlaybookDetail extends MaestroPlaybook {
   documents: Array<{
     path: string;
@@ -252,6 +309,60 @@ export const maestro = {
   async showPlaybook(playbookId: string): Promise<MaestroPlaybookDetail> {
     const raw = await run(['show', 'playbook', playbookId, '--json']);
     return JSON.parse(raw) as MaestroPlaybookDetail;
+  },
+
+  /** Show detailed agent info including stats and recent history */
+  async showAgent(agentId: string): Promise<MaestroAgentDetail> {
+    const raw = await run(['show', 'agent', agentId, '--json']);
+    return JSON.parse(raw) as MaestroAgentDetail;
+  },
+
+  /** Publish an agent's session transcript as a GitHub gist */
+  async createGist(
+    agentId: string,
+    opts: { description?: string; isPublic?: boolean } = {},
+  ): Promise<GistResult> {
+    const args = ['gist', 'create', agentId];
+    if (opts.description) args.push('-d', opts.description);
+    if (opts.isPublic) args.push('-p');
+    const raw = await run(args, { timeoutMs: 60_000 });
+    return JSON.parse(raw) as GistResult;
+  },
+
+  /** Generate AI synopsis of recent activity (requires running Maestro app) */
+  async directorSynopsis(opts: { days?: number } = {}): Promise<DirectorSynopsis> {
+    const args = ['director-notes', 'synopsis', '--json'];
+    if (opts.days != null) args.push('-d', String(opts.days));
+    // Synopsis generation involves AI inference — give it 2 minutes
+    const raw = await run(args, { timeoutMs: 120_000 });
+    return JSON.parse(raw) as DirectorSynopsis;
+  },
+
+  /** Show unified history across all agents */
+  async directorHistory(
+    opts: { days?: number; limit?: number; filter?: 'auto' | 'user' | 'cue' } = {},
+  ): Promise<DirectorNotesEntry[]> {
+    const args = ['director-notes', 'history', '--json'];
+    if (opts.days != null) args.push('-d', String(opts.days));
+    if (opts.limit != null) args.push('-l', String(opts.limit));
+    if (opts.filter) args.push('--filter', opts.filter);
+    const raw = await run(args);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as DirectorNotesEntry[];
+    if (Array.isArray(parsed?.entries)) return parsed.entries as DirectorNotesEntry[];
+    return [];
+  },
+
+  /** Configure and launch an Auto Run with the given documents */
+  async startAutoRun(opts: AutoRunOptions): Promise<string> {
+    if (!opts.docs.length) throw new Error('startAutoRun requires at least one document');
+    const args = ['auto-run', '--launch', '--agent', opts.agentId];
+    if (opts.prompt) args.push('--prompt', opts.prompt);
+    if (opts.maxLoops != null) args.push('--max-loops', String(opts.maxLoops));
+    else if (opts.loop) args.push('--loop');
+    if (opts.resetOnCompletion) args.push('--reset-on-completion');
+    args.push(...opts.docs);
+    return run(args, { timeoutMs: 60_000 });
   },
 
   /** Run a playbook and return the final completion event. Uses --wait so the CLI blocks until done. */

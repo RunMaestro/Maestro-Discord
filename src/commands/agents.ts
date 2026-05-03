@@ -36,6 +36,18 @@ export const data = new SlashCommandBuilder()
       ),
   )
   .addSubcommand((sub) =>
+    sub
+      .setName('show')
+      .setDescription("Show an agent's details, stats, and recent activity")
+      .addStringOption((opt) =>
+        opt
+          .setName('agent')
+          .setDescription('Select an agent')
+          .setRequired(true)
+          .setAutocomplete(true),
+      ),
+  )
+  .addSubcommand((sub) =>
     sub.setName('disconnect').setDescription('Remove this agent channel (deletes the channel)'),
   )
   .addSubcommand((sub) =>
@@ -86,6 +98,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await handleList(interaction);
   } else if (sub === 'new') {
     await handleNew(interaction);
+  } else if (sub === 'show') {
+    await handleShow(interaction);
   } else if (sub === 'disconnect') {
     await handleDisconnect(interaction);
   } else if (sub === 'readonly') {
@@ -192,6 +206,72 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
       `Type any message here and it will be sent to this agent.\n` +
       `-# Agent: \`${agent.id}\` • ${agent.toolType} • \`${agent.cwd}\``,
   );
+}
+
+async function handleShow(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+
+  const agentId = interaction.options.getString('agent', true);
+
+  let detail;
+  try {
+    detail = await maestro.showAgent(agentId);
+  } catch (err) {
+    await interaction.editReply(`❌ Could not load agent: ${(err as Error).message}`);
+    return;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle(detail.name)
+    .addFields(
+      { name: 'ID', value: `\`${detail.id}\``, inline: false },
+      { name: 'Tool', value: detail.toolType, inline: true },
+      { name: 'Cwd', value: `\`${detail.cwd}\``, inline: false },
+    );
+
+  if (detail.groupName) {
+    embed.addFields({ name: 'Group', value: detail.groupName, inline: true });
+  }
+
+  const stats = detail.stats;
+  if (stats) {
+    const statLines: string[] = [];
+    if (typeof stats.historyEntries === 'number') {
+      const ok = stats.successCount ?? 0;
+      const fail = stats.failureCount ?? 0;
+      statLines.push(`History: ${stats.historyEntries} entries (${ok} ok · ${fail} failed)`);
+    }
+    if (typeof stats.totalInputTokens === 'number' || typeof stats.totalOutputTokens === 'number') {
+      statLines.push(
+        `Tokens: ${stats.totalInputTokens ?? 0}↓ ${stats.totalOutputTokens ?? 0}↑`,
+      );
+    }
+    if (typeof stats.totalCost === 'number' && stats.totalCost > 0) {
+      statLines.push(`Cost: $${stats.totalCost.toFixed(4)}`);
+    }
+    if (typeof stats.totalElapsedMs === 'number' && stats.totalElapsedMs > 0) {
+      statLines.push(`Total elapsed: ${(stats.totalElapsedMs / 1000).toFixed(1)}s`);
+    }
+    if (statLines.length) {
+      embed.addFields({ name: 'Stats', value: statLines.join('\n') });
+    }
+  }
+
+  if (detail.recentHistory && detail.recentHistory.length > 0) {
+    const recent = detail.recentHistory
+      .slice(0, 5)
+      .map((h) => {
+        const when = new Date(h.timestamp).toLocaleString();
+        const status = h.success === false ? '⚠️' : '•';
+        const summary = (h.summary ?? '').slice(0, 90);
+        return `${status} ${when} — ${summary}`;
+      })
+      .join('\n');
+    embed.addFields({ name: 'Recent activity', value: recent });
+  }
+
+  await interaction.editReply({ embeds: [embed] });
 }
 
 async function handleReadonly(interaction: ChatInputCommandInteraction): Promise<void> {

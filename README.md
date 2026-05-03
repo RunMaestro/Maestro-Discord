@@ -158,10 +158,18 @@ npm run build && node --test --experimental-test-coverage dist/__tests__/**/*.te
 | `/health`                  | Verify Maestro CLI is installed and working                   |
 | `/agents list`             | Show all available agents                                     |
 | `/agents new <agent>`      | Create a dedicated channel for an agent (autocomplete)        |
+| `/agents show <agent>`     | Show an agent's stats and recent activity                     |
 | `/agents disconnect`       | (Run inside an agent channel) Remove and delete the channel   |
 | `/agents readonly on\|off` | Toggle read-only mode for the current agent channel           |
 | `/session new`             | Create a new owner-bound thread for the current agent channel |
 | `/session list`            | List session threads for the current agent channel            |
+| `/playbook list`           | List playbooks (optionally filter by agent)                   |
+| `/playbook show <id>`      | Show details for a playbook                                   |
+| `/playbook run <id>`       | Run a playbook and post the completion summary in-channel     |
+| `/auto-run start <doc>`    | Launch an Auto Run document for the current agent channel     |
+| `/gist`                    | Publish the current agent's session transcript as a GitHub gist |
+| `/notes synopsis`          | Post an AI-generated synopsis of recent activity              |
+| `/notes history`           | Post a unified history feed across agents                     |
 
 ## How it works
 
