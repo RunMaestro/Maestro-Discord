@@ -142,6 +142,18 @@ install_release() {
     info "Preserved SQLite database"
   fi
 
+  # Migrate .env from a legacy install (e.g. manual git clone) into the XDG
+  # config dir so write_config will preserve it instead of writing a template.
+  if [ -n "$RELEASE_BACKUP" ] \
+     && [ -f "$RELEASE_BACKUP/.env" ] \
+     && [ ! -L "$RELEASE_BACKUP/.env" ] \
+     && [ ! -f "$CONFIG_DIR/.env" ]; then
+    mkdir -p "$CONFIG_DIR"
+    cp "$RELEASE_BACKUP/.env" "$CONFIG_DIR/.env"
+    chmod 600 "$CONFIG_DIR/.env"
+    info "Migrated existing .env → $CONFIG_DIR/.env"
+  fi
+
   ok "Extracted release to $INSTALL_DIR"
 }
 
@@ -177,7 +189,16 @@ write_config() {
     return
   fi
 
-  if [ ! -r /dev/tty ]; then
+  local interactive=0
+  [ -r /dev/tty ] && interactive=1
+  local have_required=0
+  if [ -n "${DISCORD_BOT_TOKEN:-}" ] \
+     && [ -n "${DISCORD_CLIENT_ID:-}" ] \
+     && [ -n "${DISCORD_GUILD_ID:-}" ]; then
+    have_required=1
+  fi
+
+  if [ "$interactive" -eq 0 ] && [ "$have_required" -eq 0 ]; then
     info "Non-interactive shell — writing template to $env_file (edit before starting)"
     cp "$INSTALL_DIR/.env.example" "$env_file"
     chmod 600 "$env_file"
@@ -185,8 +206,12 @@ write_config() {
     return
   fi
 
-  info "Configuring $env_file"
-  echo "  Find these values in https://discord.com/developers/applications"
+  if [ "$interactive" -eq 1 ]; then
+    info "Configuring $env_file"
+    echo "  Find these values in https://discord.com/developers/applications"
+  else
+    info "Writing config from environment to $env_file"
+  fi
   local token client_id guild_id allowed
   token="$(prompt_var DISCORD_BOT_TOKEN 'Discord bot token')"
   client_id="$(prompt_var DISCORD_CLIENT_ID 'Discord application (client) ID')"
@@ -213,16 +238,31 @@ write_config() {
   ok "Wrote $env_file"
 }
 
+config_complete() {
+  local file="$1" key value
+  [ -f "$file" ] || return 1
+  for key in DISCORD_BOT_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID; do
+    value="$(sed -nE "s/^${key}=([^#[:space:]]+).*/\1/p" "$file" | head -n1)"
+    [ -n "$value" ] || return 1
+    case "$value" in
+      your_*) return 1 ;;
+    esac
+  done
+  return 0
+}
+
 deploy_commands() {
-  if [ ! -r /dev/tty ]; then
-    warn "Skipping slash command deployment in non-interactive mode. Run 'maestro-discord-ctl deploy' later."
+  local env_file="$CONFIG_DIR/.env"
+  if ! config_complete "$env_file"; then
+    warn "Skipping slash command deployment — config at $env_file is incomplete or contains template values."
+    warn "Edit it and run 'maestro-discord-ctl deploy' when ready."
     return
   fi
   info "Deploying slash commands to Discord"
   if (cd "$INSTALL_DIR" && node dist/deploy-commands.js); then
     ok "Slash commands deployed"
   else
-    warn "Slash command deployment failed. Edit $CONFIG_DIR/.env and re-run 'maestro-discord-ctl deploy'."
+    warn "Slash command deployment failed. Edit $env_file and re-run 'maestro-discord-ctl deploy'."
   fi
 }
 
