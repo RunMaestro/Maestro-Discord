@@ -299,7 +299,7 @@ setup_voice_choose_model() {
     if [ -f "$m" ]; then
       VOICE_MODEL="$m"
       ok "Using existing model from MAESTRO_DISCORD_MODEL: $m"
-      return
+      return 0
     else
       warn "MAESTRO_DISCORD_MODEL=$m not found — falling back to download"
     fi
@@ -318,7 +318,7 @@ setup_voice_choose_model() {
         if [ -f "$m" ]; then
           VOICE_MODEL="$m"
           ok "Using existing model: $m"
-          return
+          return 0
         fi
         warn "File not found: $m"
       done
@@ -332,7 +332,7 @@ setup_voice_choose_model() {
   if [ -f "$target" ]; then
     ok "Model already present: $target"
     VOICE_MODEL="$target"
-    return
+    return 0
   fi
 
   info "Downloading $DEFAULT_MODEL_NAME (~142 MB) → $target"
@@ -346,11 +346,13 @@ setup_voice_choose_model() {
     rm -f "$tmp"
     warn "Model download failed — voice transcription will stay disabled until WHISPER_MODEL_PATH is set."
   fi
+  return 0
 }
 
 setup_voice() {
+  # Existing config — leave it alone, never re-prompt or re-download on upgrade.
   if [ -f "$CONFIG_DIR/.env" ]; then
-    return
+    return 0
   fi
 
   local ffmpeg_path whisper_path
@@ -358,11 +360,11 @@ setup_voice() {
   whisper_path="$(command -v whisper-cli 2>/dev/null || true)"
 
   if [ -z "$ffmpeg_path" ] || [ -z "$whisper_path" ]; then
-    info "Voice transcription deps not on PATH — skipping voice setup"
+    info "Voice transcription deps not on PATH — installing without voice"
     [ -z "$ffmpeg_path" ]  && warn "  ffmpeg not found"
     [ -z "$whisper_path" ] && warn "  whisper-cli not found"
     warn "Install both, then run 'maestro-discord-ctl update' to enable transcription."
-    return
+    return 0
   fi
 
   ok "Found ffmpeg: $ffmpeg_path"
@@ -375,16 +377,22 @@ setup_voice() {
     enable=0
   elif [ -r /dev/tty ]; then
     info "Configure voice transcription"
-    [ "$(prompt_yes_no '  Enable voice transcription? [Y/n] ' Y)" = "Y" ] && enable=1
+    if [ "$(prompt_yes_no '  Enable voice transcription? [Y/n] ' Y)" = "Y" ]; then
+      enable=1
+    fi
   else
     info "Non-interactive shell — skipping voice setup (set MAESTRO_DISCORD_VOICE=1 to opt in)"
   fi
 
-  [ "$enable" -eq 1 ] || return
+  if [ "$enable" -ne 1 ]; then
+    info "Voice transcription not enabled — install will continue without it"
+    return 0
+  fi
 
   VOICE_FFMPEG="$ffmpeg_path"
   VOICE_WHISPER="$whisper_path"
   setup_voice_choose_model
+  return 0
 }
 
 install_ctl() {
