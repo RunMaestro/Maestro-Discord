@@ -45,4 +45,7 @@ export const config = {
   get whisperModelPath() {
     return process.env.WHISPER_MODEL_PATH || 'models/ggml-base.en.bin';
   },
+  get whisperLanguage() {
+    return process.env.WHISPER_LANGUAGE || 'auto';
+  },
 };

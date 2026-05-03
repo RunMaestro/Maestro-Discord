@@ -157,6 +157,8 @@ export async function transcribeVoiceAttachment(attachment: Attachment): Promise
     await runCommand(getResolvedWhisperCliPath(), [
       '-m',
       config.whisperModelPath,
+      '-l',
+      config.whisperLanguage,
       '-f',
       wavPath,
       '-otxt',
