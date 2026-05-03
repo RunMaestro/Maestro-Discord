@@ -1,6 +1,7 @@
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { execute, autocomplete } from '../commands/agents';
+import { EMBED_FIELD_VALUE_MAX } from '../utils/embed';
 
 afterEach(() => {
   mock.restoreAll();
@@ -167,6 +168,98 @@ test('agents new matches agent by prefix', async () => {
 
   const reply = interaction.editReply.mock.calls[0].arguments[0];
   assert.ok(reply.includes('PrefixBot'));
+});
+
+// --- /agents show ---
+
+test('agents show renders an embed with stats and recent activity', async () => {
+  const { maestro } = await import('../services/maestro');
+  mock.method(maestro, 'showAgent', async () => ({
+    id: 'agent-1',
+    name: 'TestBot',
+    toolType: 'claude',
+    cwd: '/proj',
+    groupName: 'Group A',
+    stats: {
+      historyEntries: 12,
+      successCount: 10,
+      failureCount: 2,
+      totalInputTokens: 5000,
+      totalOutputTokens: 1000,
+      totalCost: 0.0123,
+      totalElapsedMs: 5400,
+    },
+    recentHistory: [
+      { id: 'h-1', type: 'CUE', timestamp: Date.now(), summary: 'first', success: true },
+      { id: 'h-2', type: 'CUE', timestamp: Date.now(), summary: 'second', success: false },
+    ],
+  }));
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-1',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  assert.ok(reply.embeds);
+  const data = reply.embeds[0].data;
+  assert.equal(data.title, 'TestBot');
+  const fieldNames = data.fields.map((f: { name: string }) => f.name);
+  assert.ok(fieldNames.includes('Stats'));
+  assert.ok(fieldNames.includes('Recent activity'));
+});
+
+test('agents show clamps an oversize cwd value to the field-value limit', async () => {
+  const { maestro } = await import('../services/maestro');
+  // 2000-char path comfortably exceeds the 1024 field limit (with backticks)
+  const longCwd = '/very/long/path/segment/'.repeat(100);
+  mock.method(maestro, 'showAgent', async () => ({
+    id: 'agent-1',
+    name: 'TestBot',
+    toolType: 'claude',
+    cwd: longCwd,
+  }));
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-1',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  const cwdField = reply.embeds[0].data.fields.find((f: { name: string }) => f.name === 'Cwd');
+  assert.ok(cwdField, 'Cwd field should be present');
+  assert.ok(
+    cwdField.value.length <= EMBED_FIELD_VALUE_MAX,
+    `Cwd field length ${cwdField.value.length} exceeds ${EMBED_FIELD_VALUE_MAX}`,
+  );
+});
+
+test('agents show surfaces a friendly error when load fails', async () => {
+  const { maestro } = await import('../services/maestro');
+  mock.method(maestro, 'showAgent', async () => {
+    throw new Error('agent missing');
+  });
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-x',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  assert.equal(typeof reply, 'string');
+  assert.ok(reply.includes('Could not load agent'));
 });
 
 // --- /agents disconnect ---

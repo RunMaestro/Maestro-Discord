@@ -9,6 +9,7 @@ import {
 import { maestro } from '../services/maestro';
 import { channelDb, threadDb } from '../db';
 import { cleanupAgentFiles } from '../utils/attachments';
+import { clampFieldValue } from '../utils/embed';
 import { config } from '../config';
 
 function missingBotScopeMessage(): string {
@@ -227,7 +228,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
     .addFields(
       { name: 'ID', value: `\`${detail.id}\``, inline: false },
       { name: 'Tool', value: detail.toolType, inline: true },
-      { name: 'Cwd', value: `\`${detail.cwd}\``, inline: false },
+      { name: 'Cwd', value: clampFieldValue(`\`${detail.cwd}\``), inline: false },
     );
 
   if (detail.groupName) {
@@ -254,7 +255,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
       statLines.push(`Total elapsed: ${(stats.totalElapsedMs / 1000).toFixed(1)}s`);
     }
     if (statLines.length) {
-      embed.addFields({ name: 'Stats', value: statLines.join('\n') });
+      embed.addFields({ name: 'Stats', value: clampFieldValue(statLines.join('\n')) });
     }
   }
 
@@ -268,7 +269,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
         return `${status} ${when} — ${summary}`;
       })
       .join('\n');
-    embed.addFields({ name: 'Recent activity', value: recent });
+    embed.addFields({ name: 'Recent activity', value: clampFieldValue(recent) });
   }
 
   await interaction.editReply({ embeds: [embed] });

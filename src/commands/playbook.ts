@@ -5,6 +5,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { maestro } from '../services/maestro';
+import { clampDescription, clampFieldValue } from '../utils/embed';
 
 export const data = new SlashCommandBuilder()
   .setName('playbook')
@@ -156,7 +157,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle(detail.name)
-    .setDescription(detail.description || '_(no description)_')
+    .setDescription(clampDescription(detail.description || '_(no description)_'))
     .addFields(
       { name: 'ID', value: `\`${detail.id}\``, inline: true },
       {
@@ -170,7 +171,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
     embed.addFields({ name: 'Agent', value: detail.agentName, inline: true });
   }
   if (docLines.length) {
-    embed.addFields({ name: 'Documents', value: docLines.join('\n') });
+    embed.addFields({ name: 'Documents', value: clampFieldValue(docLines.join('\n')) });
   }
 
   await interaction.editReply({ embeds: [embed] });
