@@ -1,6 +1,6 @@
 {
   "name": "discord-maestro",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Discord Maestro Bot",
   "main": "dist/index.js",
   "bin": {

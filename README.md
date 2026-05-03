@@ -139,44 +139,37 @@ If the dependencies below are missing, the bot starts normally and voice message
 
 ### Installation
 
-1. Install [ffmpeg](https://ffmpeg.org/) and [whisper-cli](https://github.com/ggerganov/whisper.cpp). On macOS via Homebrew:
+1. Install [ffmpeg](https://ffmpeg.org/) and [whisper-cli](https://github.com/ggerganov/whisper.cpp) so they're on your `PATH` **before** running the installer. macOS via Homebrew:
 
 ```bash
 brew install ffmpeg whisper-cli
 ```
 
-On Linux / Windows, install ffmpeg via your package manager and build `whisper-cli` from the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo, or use [Linuxbrew](https://docs.brew.sh/Homebrew-on-Linux).
+   On Linux/Windows, install ffmpeg via your package manager and either build `whisper-cli` from the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo (then symlink the binary into `~/.local/bin`) or use [Linuxbrew](https://docs.brew.sh/Homebrew-on-Linux).
 
-2. Download a whisper model. The default `WHISPER_MODEL_PATH=models/ggml-base.en.bin` is **relative to the bot's working directory**, so place it accordingly:
+2. **Production install (curl one-liner)** — the installer detects `ffmpeg` + `whisper-cli` on `PATH` and asks whether to enable voice transcription. If you say yes, it asks whether you already have a `ggml-*.bin` model file — paste the absolute path to reuse it, or let it download `ggml-base.en.bin` (~142 MB) into `~/.local/share/maestro-discord/models/`. Resolved **absolute** paths are written into `~/.config/maestro-discord/.env`, so the systemd/launchd service finds them regardless of `PATH`.
+
+   Non-interactive escape hatches:
+
+   ```bash
+   MAESTRO_DISCORD_VOICE=1 \
+   MAESTRO_DISCORD_MODEL=/abs/path/to/ggml-base.en.bin \
+     bash -c "$(curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Discord/main/install.sh)"
+   ```
+
+   `MAESTRO_DISCORD_VOICE=0` opts out; omitting `MAESTRO_DISCORD_MODEL` triggers the download.
+
+3. **Source install** (npm-based) — there's no wizard; download a model and set the paths yourself:
 
 ```bash
-# Production install (curl-to-bash):
-mkdir -p ~/.local/share/maestro-discord/models
-curl -L -o ~/.local/share/maestro-discord/models/ggml-base.en.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-
-# Or, for development from source — run from the repo root:
 mkdir -p ./models
 curl -L -o models/ggml-base.en.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-```
 
-Or set `WHISPER_MODEL_PATH` to an absolute path in `.env` to keep the model anywhere you like.
-
-3. **Use absolute paths in `.env` for `FFMPEG_PATH` and `WHISPER_CLI_PATH` when running under systemd / launchd.** The service units load `.env` via `EnvironmentFile=` (Linux) or an explicit `set -a; . .env` (macOS) and **do not inherit your login shell's `PATH`** — so bare names like `ffmpeg` or `whisper-cli` only resolve if the binaries live in `/usr/bin` or `/usr/local/bin`. Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`) and other custom install locations require absolute paths:
-
-```bash
-# find them with:
-which ffmpeg
-which whisper-cli
-
-# then set in ~/.config/maestro-discord/.env (production) or .env (source):
-FFMPEG_PATH=/home/linuxbrew/.linuxbrew/bin/ffmpeg          # Linuxbrew
-WHISPER_CLI_PATH=/home/linuxbrew/.linuxbrew/bin/whisper-cli
-# or on macOS Homebrew:
-FFMPEG_PATH=/opt/homebrew/bin/ffmpeg
-WHISPER_CLI_PATH=/opt/homebrew/bin/whisper-cli
-WHISPER_MODEL_PATH=/home/you/.local/share/maestro-discord/models/ggml-base.en.bin
+# in .env (use `which ffmpeg` / `which whisper-cli` to find absolute paths):
+FFMPEG_PATH=/usr/bin/ffmpeg
+WHISPER_CLI_PATH=/home/you/.local/bin/whisper-cli
+WHISPER_MODEL_PATH=models/ggml-base.en.bin
 ```
 
 The bot probes these at startup; any missing piece is logged as `⚠️ Transcription disabled: …` and transcription is skipped at runtime. After editing `.env`, restart with `maestro-discord-ctl restart`.

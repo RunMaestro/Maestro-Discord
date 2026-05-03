@@ -14,6 +14,12 @@ VERSION="${MAESTRO_DISCORD_VERSION:-latest}"
 NODE_MIN_MAJOR=22
 RELEASE_BACKUP=""
 
+VOICE_FFMPEG=""
+VOICE_WHISPER=""
+VOICE_MODEL=""
+DEFAULT_MODEL_NAME="ggml-base.en.bin"
+DEFAULT_MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${DEFAULT_MODEL_NAME}"
+
 rollback_install() {
   if [ -n "$RELEASE_BACKUP" ] && [ -d "$RELEASE_BACKUP" ]; then
     rm -rf "$INSTALL_DIR"
@@ -229,9 +235,9 @@ write_config() {
     printf 'DISCORD_ALLOWED_USER_IDS=%s\n' "$allowed"
     printf 'API_PORT=3457\n'
     printf 'DISCORD_MENTION_USER_ID=\n'
-    printf 'FFMPEG_PATH=ffmpeg\n'
-    printf 'WHISPER_CLI_PATH=whisper-cli\n'
-    printf 'WHISPER_MODEL_PATH=models/ggml-base.en.bin\n'
+    printf 'FFMPEG_PATH=%s\n' "${VOICE_FFMPEG:-ffmpeg}"
+    printf 'WHISPER_CLI_PATH=%s\n' "${VOICE_WHISPER:-whisper-cli}"
+    printf 'WHISPER_MODEL_PATH=%s\n' "${VOICE_MODEL:-models/${DEFAULT_MODEL_NAME}}"
   } > "$tmp_env"
   mv "$tmp_env" "$env_file"
   ln -sf "$env_file" "$INSTALL_DIR/.env"
@@ -264,6 +270,121 @@ deploy_commands() {
   else
     warn "Slash command deployment failed. Edit $env_file and re-run 'maestro-discord-ctl deploy'."
   fi
+}
+
+expand_tilde() {
+  local p="$1"
+  case "$p" in
+    "~"|"~/"*) printf '%s' "${HOME}${p#\~}" ;;
+    *) printf '%s' "$p" ;;
+  esac
+}
+
+prompt_yes_no() {
+  local prompt="$1" default="${2:-Y}" ans=""
+  [ -r /dev/tty ] || { printf '%s' "$default"; return; }
+  read -r -p "$prompt" ans </dev/tty || ans=""
+  [ -z "$ans" ] && ans="$default"
+  case "$ans" in
+    y|Y|yes|YES) printf 'Y' ;;
+    n|N|no|NO)   printf 'N' ;;
+    *)           printf '%s' "$default" ;;
+  esac
+}
+
+setup_voice_choose_model() {
+  if [ -n "${MAESTRO_DISCORD_MODEL:-}" ]; then
+    local m
+    m="$(expand_tilde "$MAESTRO_DISCORD_MODEL")"
+    if [ -f "$m" ]; then
+      VOICE_MODEL="$m"
+      ok "Using existing model from MAESTRO_DISCORD_MODEL: $m"
+      return
+    else
+      warn "MAESTRO_DISCORD_MODEL=$m not found — falling back to download"
+    fi
+  fi
+
+  if [ -r /dev/tty ]; then
+    if [ "$(prompt_yes_no '  Already have a whisper model downloaded? [y/N] ' N)" = "Y" ]; then
+      local input m
+      while :; do
+        read -r -p "  Absolute path to .bin model: " input </dev/tty || input=""
+        if [ -z "$input" ]; then
+          warn "No path entered — falling back to download"
+          break
+        fi
+        m="$(expand_tilde "$input")"
+        if [ -f "$m" ]; then
+          VOICE_MODEL="$m"
+          ok "Using existing model: $m"
+          return
+        fi
+        warn "File not found: $m"
+      done
+    fi
+  fi
+
+  local target_dir="$INSTALL_DIR/models"
+  local target="$target_dir/$DEFAULT_MODEL_NAME"
+  mkdir -p "$target_dir"
+
+  if [ -f "$target" ]; then
+    ok "Model already present: $target"
+    VOICE_MODEL="$target"
+    return
+  fi
+
+  info "Downloading $DEFAULT_MODEL_NAME (~142 MB) → $target"
+  local tmp
+  tmp="$(mktemp "${target}.XXXXXX")"
+  if curl -fL --progress-bar "$DEFAULT_MODEL_URL" -o "$tmp"; then
+    mv "$tmp" "$target"
+    ok "Model downloaded"
+    VOICE_MODEL="$target"
+  else
+    rm -f "$tmp"
+    warn "Model download failed — voice transcription will stay disabled until WHISPER_MODEL_PATH is set."
+  fi
+}
+
+setup_voice() {
+  if [ -f "$CONFIG_DIR/.env" ]; then
+    return
+  fi
+
+  local ffmpeg_path whisper_path
+  ffmpeg_path="$(command -v ffmpeg 2>/dev/null || true)"
+  whisper_path="$(command -v whisper-cli 2>/dev/null || true)"
+
+  if [ -z "$ffmpeg_path" ] || [ -z "$whisper_path" ]; then
+    info "Voice transcription deps not on PATH — skipping voice setup"
+    [ -z "$ffmpeg_path" ]  && warn "  ffmpeg not found"
+    [ -z "$whisper_path" ] && warn "  whisper-cli not found"
+    warn "Install both, then run 'maestro-discord-ctl update' to enable transcription."
+    return
+  fi
+
+  ok "Found ffmpeg: $ffmpeg_path"
+  ok "Found whisper-cli: $whisper_path"
+
+  local enable=0
+  if [ "${MAESTRO_DISCORD_VOICE:-}" = "1" ]; then
+    enable=1
+  elif [ "${MAESTRO_DISCORD_VOICE:-}" = "0" ]; then
+    enable=0
+  elif [ -r /dev/tty ]; then
+    info "Configure voice transcription"
+    [ "$(prompt_yes_no '  Enable voice transcription? [Y/n] ' Y)" = "Y" ] && enable=1
+  else
+    info "Non-interactive shell — skipping voice setup (set MAESTRO_DISCORD_VOICE=1 to opt in)"
+  fi
+
+  [ "$enable" -eq 1 ] || return
+
+  VOICE_FFMPEG="$ffmpeg_path"
+  VOICE_WHISPER="$whisper_path"
+  setup_voice_choose_model
 }
 
 install_ctl() {
@@ -341,6 +462,7 @@ main() {
   install_deps
   trap - ERR
   install_ctl
+  setup_voice
   write_config
   deploy_commands
   install_service
