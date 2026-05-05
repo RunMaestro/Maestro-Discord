@@ -1,7 +1,7 @@
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'path';
-import { execute } from '../commands/auto-run';
+import { execute } from '../providers/discord/commands/auto-run';
 
 afterEach(() => {
   mock.restoreAll();
@@ -38,7 +38,7 @@ function makeInteraction(
 }
 
 test('auto-run start rejects channels not connected to an agent', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => undefined);
 
   const i = makeInteraction({ doc: 'plan.md' });
@@ -49,14 +49,14 @@ test('auto-run start rejects channels not connected to an agent', async () => {
 });
 
 test('auto-run start resolves a bare filename against the agent Auto Run folder', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => ({
     channel_id: 'ch-1',
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
 
-  const { maestro } = await import('../services/maestro');
+  const { maestro } = await import('../core/maestro');
   mock.method(maestro, 'showAgent', async () => ({
     id: 'agent-1',
     name: 'TestBot',
@@ -76,14 +76,14 @@ test('auto-run start resolves a bare filename against the agent Auto Run folder'
 });
 
 test('auto-run start resolves a relative subpath against the agent Auto Run folder', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => ({
     channel_id: 'ch-1',
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
 
-  const { maestro } = await import('../services/maestro');
+  const { maestro } = await import('../core/maestro');
   mock.method(maestro, 'showAgent', async () => ({
     id: 'agent-1',
     name: 'TestBot',
@@ -103,14 +103,14 @@ test('auto-run start resolves a relative subpath against the agent Auto Run fold
 });
 
 test('auto-run start preserves an absolute path verbatim', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => ({
     channel_id: 'ch-1',
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
 
-  const { maestro } = await import('../services/maestro');
+  const { maestro } = await import('../core/maestro');
   // showAgent should not even be called when the path is absolute.
   const showAgentMock = mock.method(maestro, 'showAgent', async () => {
     throw new Error('should not be called');
@@ -127,14 +127,14 @@ test('auto-run start preserves an absolute path verbatim', async () => {
 });
 
 test('auto-run start uses the doc as-is when showAgent fails to resolve a folder', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => ({
     channel_id: 'ch-1',
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
 
-  const { maestro } = await import('../services/maestro');
+  const { maestro } = await import('../core/maestro');
   // showAgent throws — getAgentFolder should swallow and return null.
   mock.method(maestro, 'showAgent', async () => {
     throw new Error('cli unavailable');
@@ -150,14 +150,14 @@ test('auto-run start uses the doc as-is when showAgent fails to resolve a folder
 });
 
 test('auto-run start uses the doc as-is when autoRunFolderPath is missing', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => ({
     channel_id: 'ch-1',
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
 
-  const { maestro } = await import('../services/maestro');
+  const { maestro } = await import('../core/maestro');
   mock.method(maestro, 'showAgent', async () => ({
     id: 'agent-1',
     name: 'TestBot',
@@ -176,14 +176,14 @@ test('auto-run start uses the doc as-is when autoRunFolderPath is missing', asyn
 });
 
 test('auto-run start surfaces errors from startAutoRun', async () => {
-  const { channelDb } = await import('../db');
+  const { channelDb } = await import('../providers/discord/channelsDb');
   mock.method(channelDb, 'get', () => ({
     channel_id: 'ch-1',
     agent_id: 'agent-1',
     agent_name: 'TestBot',
   }));
 
-  const { maestro } = await import('../services/maestro');
+  const { maestro } = await import('../core/maestro');
   mock.method(maestro, 'showAgent', async () => ({
     id: 'agent-1',
     name: 'TestBot',

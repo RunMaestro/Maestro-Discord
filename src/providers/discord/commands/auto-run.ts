@@ -5,8 +5,8 @@ import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
 } from 'discord.js';
-import { channelDb } from '../db';
-import { maestro } from '../services/maestro';
+import { channelDb } from '../channelsDb';
+import { maestro } from '../../../core/maestro';
 
 export const data = new SlashCommandBuilder()
   .setName('auto-run')
