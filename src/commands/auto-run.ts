@@ -51,6 +51,22 @@ async function getAgentFolder(agentId: string): Promise<string | null> {
   }
 }
 
+/**
+ * Resolve `doc` (a user-supplied filename, relative path, or absolute path)
+ * to a normalized path strictly contained within `folder`. Returns null when
+ * the resolved path escapes the folder (e.g. `..` traversal or an absolute
+ * path pointing elsewhere) — callers must reject in that case.
+ */
+export function resolveContainedDocPath(folder: string, doc: string): string | null {
+  const folderResolved = path.resolve(folder);
+  const candidate = path.isAbsolute(doc) ? doc : path.join(folderResolved, doc);
+  const resolved = path.resolve(candidate);
+  if (resolved === folderResolved) return null; // doc must be a file inside, not the folder itself
+  const prefix = folderResolved.endsWith(path.sep) ? folderResolved : folderResolved + path.sep;
+  if (!resolved.startsWith(prefix)) return null;
+  return resolved;
+}
+
 export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
   const focused = interaction.options.getFocused(true);
   if (focused.name !== 'doc') return interaction.respond([]);
@@ -63,10 +79,16 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 
   let entries: string[];
   try {
-    const dirents = await fs.readdir(folder, { withFileTypes: true });
+    // Recursive so docs in subfolders (e.g. `subdir/plan.md`) are discoverable
+    // — execution already supports those relative paths. Use forward slashes
+    // for the value so the result is portable.
+    const dirents = await fs.readdir(folder, { withFileTypes: true, recursive: true });
     entries = dirents
       .filter((d) => d.isFile() && d.name.toLowerCase().endsWith('.md'))
-      .map((d) => d.name);
+      .map((d) => {
+        const abs = path.join(d.parentPath, d.name);
+        return path.relative(folder, abs).split(path.sep).join('/');
+      });
   } catch {
     return interaction.respond([]);
   }
@@ -76,7 +98,7 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
     entries
       .filter((n) => n.toLowerCase().includes(value))
       .slice(0, 25)
-      .map((n) => ({ name: n.slice(0, 100), value: n })),
+      .map((n) => ({ name: n.slice(0, 100), value: n.slice(0, 100) })),
   );
 }
 
@@ -101,11 +123,22 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const resetOnCompletion =
     interaction.options.getBoolean('reset_on_completion') ?? undefined;
 
-  // Resolve any relative path (filename or subpath) against the agent's Auto Run folder.
-  let docPath = doc;
-  if (!path.isAbsolute(doc)) {
-    const folder = await getAgentFolder(channelInfo.agent_id);
-    if (folder) docPath = path.join(folder, doc);
+  // The slash command's contract is "one of this agent's Auto Run documents",
+  // so we must enforce containment within the agent's Auto Run folder. Reject
+  // absolute paths pointing elsewhere, and `..` traversal that escapes.
+  const folder = await getAgentFolder(channelInfo.agent_id);
+  if (!folder) {
+    await interaction.editReply(
+      "❌ Could not determine this agent's Auto Run folder. Open the agent in Maestro and configure one, then try again.",
+    );
+    return;
+  }
+  const docPath = resolveContainedDocPath(folder, doc);
+  if (!docPath) {
+    await interaction.editReply(
+      "❌ Document must live inside this agent's Auto Run folder. Use a filename or relative subpath (no `..` traversal or absolute paths outside the folder).",
+    );
+    return;
   }
 
   try {
