@@ -9,7 +9,7 @@ import {
 import { maestro } from '../services/maestro';
 import { channelDb, threadDb } from '../db';
 import { cleanupAgentFiles } from '../utils/attachments';
-import { clampFieldValue } from '../utils/embed';
+import { clampFieldValue, clampTitle } from '../utils/embed';
 import { config } from '../config';
 
 function missingBotScopeMessage(): string {
@@ -187,13 +187,23 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
     });
   }
 
-  const channelName = `agent-${agent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
-  const channel = (await guild.channels.create({
+  const channelName = `agent-${agent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`.slice(
+    0,
+    100,
+  );
+  const newChannel = await guild.channels.create({
     name: channelName,
     type: ChannelType.GuildText,
     parent: category.id,
     topic: `Maestro agent: ${agent.name} (${agent.id}) | ${agent.toolType} | ${agent.cwd}`,
-  })) as TextChannel;
+  });
+  if (!newChannel.isSendable()) {
+    await interaction.editReply(
+      '❌ Failed to create a sendable channel for the agent. Check bot permissions in this server.',
+    );
+    return;
+  }
+  const channel = newChannel as TextChannel;
 
   channelDb.register(channel.id, guild.id, agent.id, agent.name);
 
@@ -224,7 +234,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
 
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle(detail.name)
+    .setTitle(clampTitle(detail.name))
     .addFields(
       { name: 'ID', value: `\`${detail.id}\``, inline: false },
       { name: 'Tool', value: detail.toolType, inline: true },
@@ -232,7 +242,7 @@ async function handleShow(interaction: ChatInputCommandInteraction): Promise<voi
     );
 
   if (detail.groupName) {
-    embed.addFields({ name: 'Group', value: detail.groupName, inline: true });
+    embed.addFields({ name: 'Group', value: clampFieldValue(detail.groupName), inline: true });
   }
 
   const stats = detail.stats;

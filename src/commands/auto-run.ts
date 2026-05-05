@@ -43,9 +43,8 @@ export const data = new SlashCommandBuilder()
 
 async function getAgentFolder(agentId: string): Promise<string | null> {
   try {
-    const agents = await maestro.listAgents();
-    const agent = agents.find((a) => a.id === agentId);
-    const folder = agent && (agent as { autoRunFolderPath?: unknown }).autoRunFolderPath;
+    const agent = await maestro.showAgent(agentId);
+    const folder = agent.autoRunFolderPath;
     return typeof folder === 'string' ? folder : null;
   } catch {
     return null;
@@ -102,9 +101,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const resetOnCompletion =
     interaction.options.getBoolean('reset_on_completion') ?? undefined;
 
-  // If the user typed a bare filename, resolve it against the agent's Auto Run folder.
+  // Resolve any relative path (filename or subpath) against the agent's Auto Run folder.
   let docPath = doc;
-  if (!path.isAbsolute(doc) && !doc.includes('/')) {
+  if (!path.isAbsolute(doc)) {
     const folder = await getAgentFolder(channelInfo.agent_id);
     if (folder) docPath = path.join(folder, doc);
   }

@@ -38,9 +38,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   try {
     result = await maestro.createGist(channelInfo.agent_id, { description, isPublic });
   } catch (err) {
-    await interaction.editReply(
-      `❌ Could not publish gist: ${(err as Error).message.slice(0, 1500)}`,
-    );
+    const message = err instanceof Error ? err.message : String(err);
+    await interaction.editReply(`❌ Could not publish gist: ${message.slice(0, 1500)}`);
     return;
   }
 

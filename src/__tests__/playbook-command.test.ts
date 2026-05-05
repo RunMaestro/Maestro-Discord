@@ -1,7 +1,11 @@
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { execute } from '../commands/playbook';
-import { EMBED_DESCRIPTION_MAX, EMBED_FIELD_VALUE_MAX } from '../utils/embed';
+import {
+  EMBED_DESCRIPTION_MAX,
+  EMBED_FIELD_VALUE_MAX,
+  EMBED_TITLE_MAX,
+} from '../utils/embed';
 
 afterEach(() => {
   mock.restoreAll();
@@ -92,6 +96,41 @@ test('playbook show clamps oversize description and document field', async () =>
   const docs = data.fields.find((f) => f.name === 'Documents');
   assert.ok(docs, 'Documents field should be present');
   assert.ok(docs!.value.length <= EMBED_FIELD_VALUE_MAX);
+});
+
+test('playbook show clamps oversize title and agent name', async () => {
+  const { maestro } = await import('../services/maestro');
+  const longName = 'P'.repeat(EMBED_TITLE_MAX + 500);
+  const longAgent = 'A'.repeat(EMBED_FIELD_VALUE_MAX + 500);
+  mock.method(maestro, 'showPlaybook', async () => ({
+    id: 'pb-1',
+    name: longName,
+    description: 'short',
+    documentCount: 1,
+    taskCount: 1,
+    agentName: longAgent,
+    documents: [],
+  }));
+
+  const i = makeInteraction('show', { playbook: 'pb-1' });
+  await execute(i as unknown as Parameters<typeof execute>[0]);
+
+  type EmbedData = {
+    title: string;
+    fields: { name: string; value: string }[];
+  };
+  const reply = i.editReply.mock.calls[0].arguments[0] as { embeds: { data: EmbedData }[] };
+  const data = reply.embeds[0].data;
+  assert.ok(
+    data.title.length <= EMBED_TITLE_MAX,
+    `Title length ${data.title.length} exceeds ${EMBED_TITLE_MAX}`,
+  );
+  const agentField = data.fields.find((f) => f.name === 'Agent');
+  assert.ok(agentField, 'Agent field should be present');
+  assert.ok(
+    agentField!.value.length <= EMBED_FIELD_VALUE_MAX,
+    `Agent field length ${agentField!.value.length} exceeds ${EMBED_FIELD_VALUE_MAX}`,
+  );
 });
 
 test('playbook show surfaces a friendly error when load fails', async () => {

@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { DEFAULT_PORT, fail, ok, postToSendApi } from '../lib';
+import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi } from '../lib';
 
 export const sendUsage = `Usage: maestro-discord send --agent <id> --message <text> [--mention] [--port <number>]
 
@@ -44,8 +44,12 @@ export async function runSend(argv: string[]): Promise<void> {
     fail('--agent and --message are required');
   }
 
-  const port = parsed.values.port ? parseInt(parsed.values.port, 10) : DEFAULT_PORT;
-  if (Number.isNaN(port)) fail('--port must be a number');
+  let port: number;
+  try {
+    port = parsePort(parsed.values.port);
+  } catch (err) {
+    fail((err as Error).message);
+  }
 
   try {
     const result = await postToSendApi(

@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
   EMBED_DESCRIPTION_MAX,
   EMBED_FIELD_VALUE_MAX,
+  EMBED_TITLE_MAX,
   clampDescription,
   clampFieldValue,
   clampText,
+  clampTitle,
 } from '../utils/embed';
 
 test('clampText returns input unchanged when within limit', () => {
@@ -33,4 +35,15 @@ test('clampFieldValue enforces the 1024 field-value limit', () => {
   const huge = 'y'.repeat(EMBED_FIELD_VALUE_MAX + 500);
   const out = clampFieldValue(huge);
   assert.equal(out.length, EMBED_FIELD_VALUE_MAX);
+});
+
+test('clampTitle enforces the 256 title limit', () => {
+  const huge = 'z'.repeat(EMBED_TITLE_MAX + 500);
+  const out = clampTitle(huge);
+  assert.equal(out.length, EMBED_TITLE_MAX);
+  assert.ok(out.endsWith('\n…'));
+});
+
+test('clampTitle leaves short titles unchanged', () => {
+  assert.equal(clampTitle('My Title'), 'My Title');
 });

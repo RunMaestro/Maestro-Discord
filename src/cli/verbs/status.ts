@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { DEFAULT_PORT, fail, ok, postToSendApi, runMaestroCli } from '../lib';
+import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi, runMaestroCli } from '../lib';
 
 export const statusUsage = `Usage: maestro-discord status --agent <id> [--port <number>]
 
@@ -82,15 +82,25 @@ export async function runStatus(argv: string[]): Promise<void> {
     fail('--agent is required');
   }
 
-  const port = parsed.values.port ? parseInt(parsed.values.port, 10) : DEFAULT_PORT;
-  if (Number.isNaN(port)) fail('--port must be a number');
+  let port: number;
+  try {
+    port = parsePort(parsed.values.port);
+  } catch (err) {
+    fail((err as Error).message);
+  }
+
+  let raw: string;
+  try {
+    raw = await runMaestroCli(['show', 'agent', agentId, '--json']);
+  } catch (err) {
+    fail(`maestro-cli show agent failed: ${(err as Error).message}`);
+  }
 
   let detail: AgentDetail;
   try {
-    const raw = await runMaestroCli(['show', 'agent', agentId, '--json']);
     detail = JSON.parse(raw) as AgentDetail;
   } catch (err) {
-    fail(`maestro-cli show agent failed: ${(err as Error).message}`);
+    fail(`Invalid JSON from maestro-cli show agent: ${(err as Error).message}`);
   }
 
   try {

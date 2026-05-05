@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { DEFAULT_PORT, fail, ok, postToSendApi } from '../lib';
+import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi } from '../lib';
 
 export const notifyUsage = `Usage: maestro-discord notify <toast|flash> [options]
 
@@ -76,8 +76,12 @@ export async function runNotify(argv: string[]): Promise<void> {
   const agentId = parsed.values.agent;
   if (!agentId) fail('--agent is required');
 
-  const port = parsed.values.port ? parseInt(parsed.values.port, 10) : DEFAULT_PORT;
-  if (Number.isNaN(port)) fail('--port must be a number');
+  let port: number;
+  try {
+    port = parsePort(parsed.values.port);
+  } catch (err) {
+    fail((err as Error).message);
+  }
 
   let content: string;
   if (sub === 'toast') {
