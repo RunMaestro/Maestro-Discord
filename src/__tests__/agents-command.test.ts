@@ -1,6 +1,7 @@
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { execute, autocomplete } from '../commands/agents';
+import { EMBED_FIELD_VALUE_MAX, EMBED_TITLE_MAX } from '../utils/embed';
 
 afterEach(() => {
   mock.restoreAll();
@@ -20,6 +21,7 @@ function makeInteraction(overrides: Record<string, unknown> = {}) {
         create: mock.fn(async (opts: Record<string, unknown>) => ({
           id: 'new-ch-1',
           name: opts.name,
+          isSendable: () => true,
           send: mock.fn(async () => ({})),
         })),
       },
@@ -147,6 +149,79 @@ test('agents new requires a guild', async () => {
   assert.ok(reply.content.includes('must be used in a server'));
 });
 
+test('agents new bounds the channel name to Discord 100-char limit', async () => {
+  const { maestro } = await import('../services/maestro');
+  // 200-char agent name will produce a > 100-char channel name (+ "agent-" prefix).
+  const longName = 'A'.repeat(200);
+  mock.method(maestro, 'listAgents', async () => [
+    { id: 'agent-long', name: longName, toolType: 'claude', cwd: '/proj' },
+  ]);
+
+  const { channelDb } = await import('../db');
+  mock.method(channelDb, 'register', () => {});
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'new',
+      getString: (_name: string, _req: boolean) => 'agent-long',
+    },
+  });
+
+  await execute(interaction);
+
+  // create() is called twice: first for the "Maestro Agents" category, then for
+  // the actual agent channel. Find the call that targets the agent channel.
+  const calls = interaction.guild.channels.create.mock.calls;
+  const channelCall = calls.find((c: { arguments: [{ name: string }] }) =>
+    c.arguments[0].name.startsWith('agent-'),
+  );
+  assert.ok(channelCall, 'Expected a channel creation call starting with "agent-"');
+  const passedName = channelCall.arguments[0].name as string;
+  assert.ok(
+    passedName.length <= 100,
+    `Channel name length ${passedName.length} exceeds Discord 100-char limit`,
+  );
+  assert.ok(passedName.startsWith('agent-'));
+});
+
+test('agents new replies with a friendly error when channel is not sendable', async () => {
+  const { maestro } = await import('../services/maestro');
+  mock.method(maestro, 'listAgents', async () => [
+    { id: 'agent-abc', name: 'TestBot', toolType: 'claude', cwd: '/proj' },
+  ]);
+
+  const { channelDb } = await import('../db');
+  const registerMock = mock.method(channelDb, 'register', () => {});
+
+  const interaction = makeInteraction({
+    guild: {
+      id: 'guild-1',
+      channels: {
+        cache: { find: () => undefined },
+        create: mock.fn(async (opts: Record<string, unknown>) => ({
+          id: 'new-ch-1',
+          name: opts.name,
+          // Simulate a non-sendable channel (e.g. permissions issue).
+          isSendable: () => false,
+          send: mock.fn(async () => ({})),
+        })),
+      },
+    },
+    options: {
+      getSubcommand: () => 'new',
+      getString: (_name: string, _req: boolean) => 'agent-abc',
+    },
+  });
+
+  await execute(interaction);
+
+  // Should not register the channel when not sendable.
+  assert.equal(registerMock.mock.callCount(), 0);
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  assert.equal(typeof reply, 'string');
+  assert.ok(reply.includes('Failed to create a sendable channel'));
+});
+
 test('agents new matches agent by prefix', async () => {
   const { maestro } = await import('../services/maestro');
   mock.method(maestro, 'listAgents', async () => [
@@ -167,6 +242,133 @@ test('agents new matches agent by prefix', async () => {
 
   const reply = interaction.editReply.mock.calls[0].arguments[0];
   assert.ok(reply.includes('PrefixBot'));
+});
+
+// --- /agents show ---
+
+test('agents show renders an embed with stats and recent activity', async () => {
+  const { maestro } = await import('../services/maestro');
+  mock.method(maestro, 'showAgent', async () => ({
+    id: 'agent-1',
+    name: 'TestBot',
+    toolType: 'claude',
+    cwd: '/proj',
+    groupName: 'Group A',
+    stats: {
+      historyEntries: 12,
+      successCount: 10,
+      failureCount: 2,
+      totalInputTokens: 5000,
+      totalOutputTokens: 1000,
+      totalCost: 0.0123,
+      totalElapsedMs: 5400,
+    },
+    recentHistory: [
+      { id: 'h-1', type: 'CUE', timestamp: Date.now(), summary: 'first', success: true },
+      { id: 'h-2', type: 'CUE', timestamp: Date.now(), summary: 'second', success: false },
+    ],
+  }));
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-1',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  assert.ok(reply.embeds);
+  const data = reply.embeds[0].data;
+  assert.equal(data.title, 'TestBot');
+  const fieldNames = data.fields.map((f: { name: string }) => f.name);
+  assert.ok(fieldNames.includes('Stats'));
+  assert.ok(fieldNames.includes('Recent activity'));
+});
+
+test('agents show clamps an oversize cwd value to the field-value limit', async () => {
+  const { maestro } = await import('../services/maestro');
+  // 2000-char path comfortably exceeds the 1024 field limit (with backticks)
+  const longCwd = '/very/long/path/segment/'.repeat(100);
+  mock.method(maestro, 'showAgent', async () => ({
+    id: 'agent-1',
+    name: 'TestBot',
+    toolType: 'claude',
+    cwd: longCwd,
+  }));
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-1',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  const cwdField = reply.embeds[0].data.fields.find((f: { name: string }) => f.name === 'Cwd');
+  assert.ok(cwdField, 'Cwd field should be present');
+  assert.ok(
+    cwdField.value.length <= EMBED_FIELD_VALUE_MAX,
+    `Cwd field length ${cwdField.value.length} exceeds ${EMBED_FIELD_VALUE_MAX}`,
+  );
+});
+
+test('agents show clamps oversize title and groupName', async () => {
+  const { maestro } = await import('../services/maestro');
+  const longName = 'N'.repeat(EMBED_TITLE_MAX + 500);
+  const longGroup = 'G'.repeat(EMBED_FIELD_VALUE_MAX + 500);
+  mock.method(maestro, 'showAgent', async () => ({
+    id: 'agent-1',
+    name: longName,
+    toolType: 'claude',
+    cwd: '/proj',
+    groupName: longGroup,
+  }));
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-1',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  const data = reply.embeds[0].data;
+  assert.ok(
+    data.title.length <= EMBED_TITLE_MAX,
+    `Title length ${data.title.length} exceeds ${EMBED_TITLE_MAX}`,
+  );
+  const groupField = data.fields.find((f: { name: string }) => f.name === 'Group');
+  assert.ok(groupField, 'Group field should be present');
+  assert.ok(
+    groupField.value.length <= EMBED_FIELD_VALUE_MAX,
+    `Group field length ${groupField.value.length} exceeds ${EMBED_FIELD_VALUE_MAX}`,
+  );
+});
+
+test('agents show surfaces a friendly error when load fails', async () => {
+  const { maestro } = await import('../services/maestro');
+  mock.method(maestro, 'showAgent', async () => {
+    throw new Error('agent missing');
+  });
+
+  const interaction = makeInteraction({
+    options: {
+      getSubcommand: () => 'show',
+      getString: (_name: string, _req: boolean) => 'agent-x',
+    },
+  });
+
+  await execute(interaction);
+
+  const reply = interaction.editReply.mock.calls[0].arguments[0];
+  assert.equal(typeof reply, 'string');
+  assert.ok(reply.includes('Could not load agent'));
 });
 
 // --- /agents disconnect ---

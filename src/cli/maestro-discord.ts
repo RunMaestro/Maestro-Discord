@@ -1,95 +1,50 @@
 #!/usr/bin/env node
-import http from 'http';
+import { runNotify, notifyUsage } from './verbs/notify';
+import { runSend, sendUsage } from './verbs/send';
+import { runStatus, statusUsage } from './verbs/status';
 
-function printUsage() {
-  console.log(`Usage: maestro-discord --agent <id> --message <text> [--mention] [--port <number>]
+const ROOT_USAGE = `Usage: maestro-discord <verb> [options]
 
-Options:
-  --agent    Maestro agent ID (required)
-  --message  Message text to send (required)
-  --mention  Mention users in the Discord channel
-  --port     API port (default: 3457)
-  --help     Show this help`);
+Verbs:
+  send      Send a message to an agent's Discord channel
+  notify    Post a styled toast/flash notification to an agent's channel
+  status    Post the agent's current status (cwd, usage, tokens) to its channel
+
+Run 'maestro-discord <verb> --help' for verb-specific options.`;
+
+function printRootHelp(): void {
+  console.log(ROOT_USAGE);
+  console.log('\n--- send ---\n' + sendUsage);
+  console.log('\n--- notify ---\n' + notifyUsage);
+  console.log('\n--- status ---\n' + statusUsage);
 }
 
-let agentId = '';
-let message = '';
-let mention = false;
-let port = 3457;
+async function main(): Promise<void> {
+  const [verb, ...rest] = process.argv.slice(2);
 
-const args = process.argv.slice(2);
-for (let i = 0; i < args.length; i++) {
-  switch (args[i]) {
-    case '--agent':
-      agentId = args[++i] || '';
-      break;
-    case '--message':
-      message = args[++i] || '';
-      break;
-    case '--mention':
-      mention = true;
-      break;
-    case '--port':
-      port = parseInt(args[++i] || '3457', 10);
-      break;
-    case '--help':
-      printUsage();
-      process.exit(0);
-      break;
+  if (!verb || verb === '--help' || verb === '-h') {
+    printRootHelp();
+    process.exit(verb ? 0 : 1);
+  }
+
+  switch (verb) {
+    case 'send':
+      await runSend(rest);
+      return;
+    case 'notify':
+      await runNotify(rest);
+      return;
+    case 'status':
+      await runStatus(rest);
+      return;
     default:
-      console.error(`Unknown flag: ${args[i]}`);
+      console.error(`Unknown verb: ${verb}\n`);
+      console.error(ROOT_USAGE);
       process.exit(1);
   }
 }
 
-if (!agentId || !message) {
-  console.error('Error: --agent and --message are required\n');
-  printUsage();
-  process.exit(1);
-}
-
-const payload = JSON.stringify({ agentId, message, mention });
-
-const req = http.request(
-  {
-    hostname: '127.0.0.1',
-    port,
-    path: '/api/send',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(payload),
-    },
-  },
-  (res) => {
-    let body = '';
-    res.on('data', (chunk) => (body += chunk));
-    res.on('end', () => {
-      try {
-        const result = JSON.parse(body);
-        if (result.success) {
-          console.log(JSON.stringify(result));
-          process.exit(0);
-        } else {
-          console.error(JSON.stringify(result));
-          process.exit(1);
-        }
-      } catch {
-        console.error('Invalid response from bot');
-        process.exit(1);
-      }
-    });
-  },
-);
-
-req.on('error', (err) => {
-  if ((err as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
-    console.error('Error: Bot is not running or API server is not started');
-  } else {
-    console.error(`Error: ${err.message}`);
-  }
+main().catch((err) => {
+  console.error(`Error: ${(err as Error).message}`);
   process.exit(1);
 });
-
-req.write(payload);
-req.end();

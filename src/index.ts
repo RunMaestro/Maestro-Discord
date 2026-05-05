@@ -1,17 +1,38 @@
-import { Client, GatewayIntentBits, Interaction } from 'discord.js';
+import {
+  AutocompleteInteraction,
+  ChatInputCommandInteraction,
+  Client,
+  GatewayIntentBits,
+  Interaction,
+  SlashCommandBuilder,
+} from 'discord.js';
 import { config } from './config';
 import * as health from './commands/health';
 import * as agents from './commands/agents';
 import * as session from './commands/session';
+import * as playbook from './commands/playbook';
+import * as gist from './commands/gist';
+import * as notes from './commands/notes';
+import * as autoRun from './commands/auto-run';
 import './db'; // ensure DB is initialized on startup
+
+interface CommandModule {
+  data: { name: string } & Pick<SlashCommandBuilder, 'toJSON'>;
+  execute(interaction: ChatInputCommandInteraction): Promise<void>;
+  autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
+}
 import { checkTranscriptionDependencies } from './services/transcription';
 import { handleMessageCreate } from './handlers/messageCreate';
 import { startServer } from './server';
 
-const commands = new Map([
+const commands = new Map<string, CommandModule>([
   [health.data.name, health],
   [agents.data.name, agents],
   [session.data.name, session],
+  [playbook.data.name, playbook],
+  [gist.data.name, gist],
+  [notes.data.name, notes],
+  [autoRun.data.name, autoRun],
 ]);
 
 const client = new Client({
@@ -39,9 +60,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       await interaction.respond([]);
       return;
     }
-    const cmd = commands.get(interaction.commandName) as {
-      autocomplete?: (i: typeof interaction) => Promise<void>;
-    };
+    const cmd = commands.get(interaction.commandName);
     if (cmd?.autocomplete) {
       try {
         await cmd.autocomplete(interaction);
