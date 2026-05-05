@@ -83,9 +83,16 @@ test('postToSendApi rejects with timeout error when server stalls', async () => 
 });
 
 test('postToSendApi reports a friendly message on ECONNREFUSED', async () => {
-  // Use a port that nothing is listening on. Picking 1 is reliably refused.
+  // Bind a server to a random free port, then close it immediately. The OS
+  // won't reassign the port instantly, so connecting to it gets refused
+  // predictably across platforms (port 1 isn't reliably refused on Windows).
+  const probe = http.createServer();
+  await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+  const port = (probe.address() as AddressInfo).port;
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+
   await assert.rejects(
-    postToSendApi({ agentId: 'a-1', message: 'hi' }, 1, 1000),
+    postToSendApi({ agentId: 'a-1', message: 'hi' }, port, 1000),
     /not running|not started|ECONNREFUSED/i,
   );
 });

@@ -4,7 +4,6 @@ import {
   SlashCommandBuilder,
   EmbedBuilder,
   ChannelType,
-  TextChannel,
 } from 'discord.js';
 import { maestro } from '../services/maestro';
 import { channelDb, threadDb } from '../db';
@@ -203,7 +202,7 @@ async function handleNew(interaction: ChatInputCommandInteraction): Promise<void
     );
     return;
   }
-  const channel = newChannel as TextChannel;
+  const channel = newChannel;
 
   channelDb.register(channel.id, guild.id, agent.id, agent.name);
 

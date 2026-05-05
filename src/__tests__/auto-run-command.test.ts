@@ -121,6 +121,7 @@ test('auto-run start preserves an absolute path verbatim', async () => {
   await execute(i as unknown as Parameters<typeof execute>[0]);
 
   assert.equal(showAgentMock.mock.callCount(), 0);
+  assert.equal(startMock.mock.callCount(), 1);
   const opts = startMock.mock.calls[0].arguments[0] as { docs: string[] };
   assert.deepEqual(opts.docs, ['/abs/path/doc.md']);
 });
@@ -143,6 +144,7 @@ test('auto-run start uses the doc as-is when showAgent fails to resolve a folder
   const i = makeInteraction({ doc: 'plan.md' });
   await execute(i as unknown as Parameters<typeof execute>[0]);
 
+  assert.equal(startMock.mock.callCount(), 1);
   const opts = startMock.mock.calls[0].arguments[0] as { docs: string[] };
   assert.deepEqual(opts.docs, ['plan.md']);
 });
@@ -168,6 +170,7 @@ test('auto-run start uses the doc as-is when autoRunFolderPath is missing', asyn
   const i = makeInteraction({ doc: 'plan.md' });
   await execute(i as unknown as Parameters<typeof execute>[0]);
 
+  assert.equal(startMock.mock.callCount(), 1);
   const opts = startMock.mock.calls[0].arguments[0] as { docs: string[] };
   assert.deepEqual(opts.docs, ['plan.md']);
 });

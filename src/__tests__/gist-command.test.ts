@@ -154,4 +154,11 @@ test('gist truncates very long error messages to 1500 chars', async () => {
   const reply = i.editReply.mock.calls[0].arguments[0] as string;
   // header text "❌ Could not publish gist: " is added on top of 1500 chars
   assert.ok(reply.length <= 1500 + 50);
+  // Lower bound catches over-truncation regressions: the body must still
+  // contain ~1500 chars of the original error.
+  assert.ok(
+    reply.length >= 1500,
+    `reply length ${reply.length} indicates over-truncation`,
+  );
+  assert.ok(reply.startsWith('❌ Could not publish gist:'));
 });
