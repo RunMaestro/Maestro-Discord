@@ -1,16 +1,40 @@
 # Architecture
 
-## Message flow
+Maestro Bridge is built around a **provider-agnostic kernel** plus pluggable **provider adapters**. The kernel handles queueing, agent dispatch, persistence, transcription, and the HTTP API; adapters translate platform events into a small set of kernel types and back out into platform actions.
 
-1. `/agents list` reads running agents from Maestro.
-2. `/agents new` creates a text channel under the **Maestro Agents** category.
-3. Users mention the bot (`@bot` or `@BotRole`) in an agent channel to create a dedicated thread.
-4. The triggering message is forwarded to the agent so the user gets an immediate response.
-5. Messages in registered threads are queued and forwarded to `maestro-cli`.
-6. The bot adds a ⏳ reaction while waiting, shows typing, and splits long replies.
-7. After each response, the bot posts a usage footer with tokens, cost, and context.
+## Kernel ↔ Provider contract
 
-## Thread ownership
+Each provider implements `BridgeProvider` (from `src/core/types.ts`):
+
+| Method                          | Purpose                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| `start(ctx)`                    | Connect to the platform, register event handlers, call `ctx.enqueue` per msg   |
+| `stop()`                        | Disconnect and release resources                                               |
+| `resolveConversation(message)`  | Look up the maestro agent + session bound to this conversation                 |
+| `send(target, msg)`             | Post a message into a channel/thread                                           |
+| `react?(target, emoji)`         | Optional: queue/transcription indicator (e.g. ⏳, 🎧)                          |
+| `sendTyping?(target)`           | Optional: typing indicator while the agent thinks                              |
+| `findOrCreateAgentChannel(id)`  | Look up or create the platform channel bound to an agent (used by `/api/send`) |
+| `isReady()`                     | Provider readiness for `/api/health`                                           |
+
+The kernel speaks only in `IncomingMessage` / `OutgoingMessage` / `ChannelTarget`; it has zero `discord.js` imports.
+
+## Message flow (Discord)
+
+1. User runs `/agents new` in their server → Discord adapter creates a text channel under the **Maestro Agents** category and registers it in `agent_channels` with `provider='discord'`.
+2. User mentions the bot in an agent channel → Discord adapter creates a thread, registers it in `discord_agent_threads`, and forwards the triggering message into the thread.
+3. Each thread/channel message becomes an `IncomingMessage` and is passed to `ctx.enqueue`.
+4. The kernel queue serializes per `(provider, channelId)`:
+   - Calls `provider.react('⏳')` and `provider.sendTyping()`
+   - Resolves the conversation via `provider.resolveConversation` (returns `{agentId, sessionId, readOnly, persistSession}`)
+   - Downloads any attachments to the agent's `cwd`
+   - Calls `maestro.send(agentId, content, sessionId, readOnly)`
+   - Splits the response and calls `provider.send(target, {text})` for each part
+   - Posts a usage footer: tokens, cost, context %
+   - Persists the maestro session id on the first response via `conv.persistSession`
+5. Errors are logged to `logs/errors.log` and surfaced as a `⚠️` reply in the channel.
+
+## Thread ownership (Discord)
 
 Each thread is bound to the user who created it (via mention or `/session new`).
 
@@ -20,20 +44,41 @@ Each thread is bound to the user who created it (via mention or `/session new`).
 
 ## Read-only mode
 
-`/agents readonly on` puts an agent channel into read-only mode. In this mode the bot relays messages from the agent (via the HTTP API) but does **not** forward user messages to the agent. Use `/agents readonly off` to resume normal two-way messaging.
+`/agents readonly on` puts an agent channel into read-only mode. In this mode the bridge relays messages from the agent (via the HTTP API) but does **not** forward user messages to the agent. Use `/agents readonly off` to resume normal two-way messaging.
+
+## Database
+
+| Table                     | Owner                 | Purpose                                             |
+| ------------------------- | --------------------- | --------------------------------------------------- |
+| `agent_channels`          | core                  | `(provider, channel_id)` → agent + session + flags  |
+| `discord_agent_threads`   | discord provider      | Thread → channel + agent + owner + session          |
+
+The schema upgrades on first start: legacy `agent_channels` (single-PK `channel_id`) is rebuilt with composite PK `(provider, channel_id)` and existing rows defaulted to `discord`; legacy `agent_threads` is renamed to `discord_agent_threads`.
 
 ## Project layout
 
-| Path                            | Purpose                                                |
-| ------------------------------- | ------------------------------------------------------ |
-| `src/config.ts`                 | Environment variable loading                           |
-| `src/db/index.ts`               | SQLite channel registry (`agent_channels` table)       |
-| `src/services/maestro.ts`       | `maestro-cli` wrapper (listAgents, listSessions, send) |
-| `src/services/queue.ts`         | Per-channel FIFO message queue                         |
-| `src/services/logger.ts`        | Logging service                                        |
-| `src/server.ts`                 | Internal HTTP API server                               |
-| `src/commands/`                 | Slash command handlers                                 |
-| `src/handlers/messageCreate.ts` | Discord message listener                               |
-| `src/utils/splitMessage.ts`     | Splits long messages for Discord's 2000-char limit     |
-| `src/deploy-commands.ts`        | Registers slash commands with Discord API              |
-| `bin/maestro-discord.ts`        | CLI tool for agent-to-Discord messaging                |
+| Path                                          | Purpose                                                |
+| --------------------------------------------- | ------------------------------------------------------ |
+| `src/core/types.ts`                           | Provider contract types                                |
+| `src/core/queue.ts`                           | Per-conversation FIFO message queue                    |
+| `src/core/api.ts`                             | Internal HTTP API server                               |
+| `src/core/providers.ts`                       | Provider registry                                      |
+| `src/core/db/index.ts`                        | SQLite channel registry                                |
+| `src/core/db/migrations.ts`                   | Idempotent schema migrations                           |
+| `src/core/maestro.ts`                         | `maestro-cli` wrapper                                  |
+| `src/core/transcription.ts`                   | ffmpeg + whisper pipeline                              |
+| `src/core/attachments.ts`                     | Provider-agnostic attachment download                  |
+| `src/providers/discord/adapter.ts`            | DiscordProvider implementing BridgeProvider            |
+| `src/providers/discord/messageCreate.ts`      | Discord message → IncomingMessage                      |
+| `src/providers/discord/voice.ts`              | Discord voice-message detection                        |
+| `src/providers/discord/commands/`             | Slash command handlers                                 |
+| `src/providers/discord/deploy.ts`             | Registers slash commands with Discord API              |
+| `src/cli/maestro-bridge.ts`                   | CLI tool for agent → chat messaging                    |
+| `src/index.ts`                                | Kernel orchestrator (entry point)                      |
+
+## Adding a new provider
+
+1. Create `src/providers/<name>/adapter.ts` exporting a class implementing `BridgeProvider`.
+2. Add a `case '<name>'` branch to `loadProvider` in `src/core/providers.ts`.
+3. Document the provider's env vars in `.env.example`.
+4. Users opt in by setting `ENABLED_PROVIDERS=discord,<name>`.

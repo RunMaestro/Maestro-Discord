@@ -1,10 +1,10 @@
 import { parseArgs } from 'node:util';
 import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi, runMaestroCli } from '../lib';
 
-export const statusUsage = `Usage: maestro-discord status --agent <id> [--port <number>]
+export const statusUsage = `Usage: maestro-bridge status --agent <id> [--port <number>]
 
 Fetch agent details from maestro-cli and post a formatted status summary to
-the agent's Discord channel.
+the agent's bridge channel.
 
 Options:
   -a, --agent <id>     Maestro agent ID (required)

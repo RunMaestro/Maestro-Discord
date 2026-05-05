@@ -1,26 +1,35 @@
-# Maestro-to-Discord Messaging API
+# Maestro Bridge HTTP API
 
-Maestro agents can send messages to Discord using the `maestro-discord` CLI.
-The bot exposes a local HTTP API that the CLI calls.
+Maestro agents can push messages into chat using the `maestro-bridge` CLI (or any HTTP client). The bridge exposes a local HTTP API on `127.0.0.1:API_PORT` (default 3457).
+
+The legacy binary name `maestro-discord` is preserved as an alias of `maestro-bridge` and is fully equivalent.
 
 ## Setup
 
-The API server starts automatically with the bot on port 3457 (configurable via `API_PORT` in `.env`).
+The API server starts automatically with the bridge. Port is configurable via `API_PORT` in `.env`.
 
 ## CLI usage
 
 ```bash
-# Send a message to an agent's Discord channel
-maestro-discord --agent <agent-id> --message "Hello from Maestro"
+# Send a message to an agent's bridge channel (default provider: discord)
+maestro-bridge send --agent <agent-id> --message "Hello from Maestro"
 
-# Send with @mention (pings the user set in DISCORD_MENTION_USER_ID)
-maestro-discord --agent <agent-id> --message "Build complete!" --mention
+# Send with @mention (uses the provider's configured mention target,
+# e.g. DISCORD_MENTION_USER_ID for the Discord provider)
+maestro-bridge send --agent <agent-id> --message "Build complete!" --mention
 
 # Use a custom port
-maestro-discord --agent <agent-id> --message "Hello" --port 4000
+maestro-bridge send --agent <agent-id> --message "Hello" --port 4000
+
+# Post a styled toast or flash notification
+maestro-bridge notify toast --agent <id> --title "Deploy" --message "Done" --color green
+maestro-bridge notify flash --agent <id> --message "Tests passing" --color green
+
+# Post the agent's current status (pulls from `maestro-cli show agent --json`)
+maestro-bridge status --agent <id>
 ```
 
-If the agent doesn't have a connected Discord channel yet, one is created automatically.
+If the agent doesn't have a connected channel yet, one is auto-created.
 
 ## Health check
 
@@ -28,36 +37,63 @@ If the agent doesn't have a connected Discord channel yet, one is created automa
 curl http://127.0.0.1:3457/api/health
 ```
 
-Returns `{"success":true,"status":"ok","uptime":123.45}` when the bot is connected.
+Returns:
+
+```json
+{
+  "success": true,
+  "status": "ok",
+  "uptime": 123.45,
+  "providers": { "discord": true }
+}
+```
 
 ## API endpoints
 
 ### POST /api/send
 
-Sends a message to an agent's Discord channel (auto-creates if needed).
+Sends a message to an agent's chat channel (auto-creates if needed).
 
 Request: `Content-Type: application/json`
 
 ```json
-{ "agentId": "string", "message": "string", "mention": false }
+{
+  "agentId": "string",
+  "message": "string",
+  "mention": false,
+  "provider": "discord"
+}
 ```
+
+`provider` is optional and defaults to `"discord"`. Must be a name listed in `ENABLED_PROVIDERS`.
+
+`mention` is rendered by the provider in a platform-appropriate way (Discord prepends `<@DISCORD_MENTION_USER_ID>` to the first part of a multi-part message).
 
 ### GET /api/health
 
-Returns bot status: `{"success":true,"status":"ok","uptime":123.45}`
+Returns bridge status:
 
-Returns `503` with `"status":"not_ready"` if the bot is disconnected.
+```json
+{
+  "success": true,
+  "status": "ok",
+  "uptime": 123.45,
+  "providers": { "discord": true }
+}
+```
+
+Returns `503` with `"status":"not_ready"` if no provider is connected.
 
 ## Error codes
 
-| Status | Meaning                                         |
-| ------ | ----------------------------------------------- |
-| `200`  | Success                                         |
-| `400`  | Missing/invalid fields or malformed JSON        |
-| `404`  | Agent not found in Maestro                      |
-| `405`  | Method not allowed                              |
-| `413`  | Request body exceeds 1 MB                       |
-| `415`  | Wrong Content-Type (must be `application/json`) |
-| `429`  | Rate limited by Discord after 3 retries         |
-| `500`  | Internal server error                           |
-| `503`  | Bot not connected to Discord                    |
+| Status | Meaning                                                        |
+| ------ | -------------------------------------------------------------- |
+| `200`  | Success                                                        |
+| `400`  | Missing/invalid fields, malformed JSON, or unknown `provider`  |
+| `404`  | Agent not found in Maestro                                     |
+| `405`  | Method not allowed                                             |
+| `413`  | Request body exceeds 1 MB                                      |
+| `415`  | Wrong Content-Type (must be `application/json`)                |
+| `429`  | Rate limited by upstream platform after 3 retries              |
+| `500`  | Internal server error                                          |
+| `503`  | The named provider is not connected                            |

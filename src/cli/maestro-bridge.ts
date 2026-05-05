@@ -3,14 +3,16 @@ import { runNotify, notifyUsage } from './verbs/notify';
 import { runSend, sendUsage } from './verbs/send';
 import { runStatus, statusUsage } from './verbs/status';
 
-const ROOT_USAGE = `Usage: maestro-discord <verb> [options]
+const ROOT_USAGE = `Usage: maestro-bridge <verb> [options]
 
 Verbs:
-  send      Send a message to an agent's Discord channel
+  send      Send a message to an agent's bridge channel
   notify    Post a styled toast/flash notification to an agent's channel
   status    Post the agent's current status (cwd, usage, tokens) to its channel
 
-Run 'maestro-discord <verb> --help' for verb-specific options.`;
+Run 'maestro-bridge <verb> --help' for verb-specific options.
+
+Note: 'maestro-discord' is preserved as an alias for backwards compatibility.`;
 
 function printRootHelp(): void {
   console.log(ROOT_USAGE);
