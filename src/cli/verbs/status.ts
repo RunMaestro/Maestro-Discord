@@ -1,13 +1,14 @@
 import { parseArgs } from 'node:util';
 import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi, runMaestroCli } from '../lib';
 
-export const statusUsage = `Usage: maestro-relay status --agent <id> [--port <number>]
+export const statusUsage = `Usage: maestro-relay status --agent <id> [--provider <name>] [--port <number>]
 
 Fetch agent details from maestro-cli and post a formatted status summary to
 the agent's bridge channel.
 
 Options:
   -a, --agent <id>     Maestro agent ID (required)
+      --provider <name> Provider/module name (default: discord)
       --mention        Mention the user set in DISCORD_MENTION_USER_ID
   -p, --port <number>  API port (default: ${DEFAULT_PORT})
   -h, --help           Show this help`;
@@ -60,6 +61,7 @@ export async function runStatus(argv: string[]): Promise<void> {
       args: argv,
       options: {
         agent: { type: 'string', short: 'a' },
+        provider: { type: 'string' },
         mention: { type: 'boolean', default: false },
         port: { type: 'string', short: 'p' },
         help: { type: 'boolean', short: 'h', default: false },
@@ -105,7 +107,12 @@ export async function runStatus(argv: string[]): Promise<void> {
 
   try {
     const result = await postToSendApi(
-      { agentId, message: formatStatus(detail), mention: parsed.values.mention },
+      {
+        agentId,
+        message: formatStatus(detail),
+        provider: parsed.values.provider,
+        mention: parsed.values.mention,
+      },
       port,
     );
     ok(result);

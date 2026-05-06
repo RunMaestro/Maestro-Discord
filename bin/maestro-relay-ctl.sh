@@ -76,6 +76,7 @@ Commands:
 Environment:
   MAESTRO_RELAY_HOME    Override install dir  (default: ~/.local/share/maestro-relay)
   XDG_CONFIG_HOME        Config dir parent     (default: ~/.config)
+  MAESTRO_RELAY_MODULE   Installer-time module selection (currently: discord)
   MAESTRO_BRIDGE_HOME    Accepted as fallback for back-compat
   MAESTRO_DISCORD_HOME   Accepted as fallback for back-compat with v0.0.x
 EOF
@@ -143,8 +144,15 @@ cmd_logs() {
 
 cmd_deploy() {
   require_install
-  [ -f "$INSTALL_DIR/.env" ] || die "Config missing: $INSTALL_DIR/.env"
-  (cd "$INSTALL_DIR" && node dist/providers/discord/deploy.js)
+  local env_file="$INSTALL_DIR/.env"
+  [ -f "$env_file" ] || die "Config missing: $env_file"
+  local enabled_providers
+  enabled_providers="$(sed -nE 's/^[[:space:]]*ENABLED_PROVIDERS[[:space:]]*=[[:space:]]*([^#[:space:]]+).*$/\1/p' "$env_file" | head -n1)"
+  [ -z "$enabled_providers" ] && enabled_providers="discord"
+  case ",$enabled_providers," in
+    *,discord,*) (cd "$INSTALL_DIR" && node dist/providers/discord/deploy.js) ;;
+    *) die "Discord is not enabled in ENABLED_PROVIDERS=$enabled_providers" ;;
+  esac
 }
 
 cmd_update() {

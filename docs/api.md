@@ -17,6 +17,9 @@ list, or `maestro-relay <verb> --help` for verb-specific options.
 # Send a message to an agent's bridge channel (default provider: discord)
 maestro-relay send --agent <agent-id> --message "Hello from Maestro"
 
+# Send to an explicit provider/module
+maestro-relay send --agent <agent-id> --provider discord --message "Hello from Maestro"
+
 # Send with @mention (uses the provider's configured mention target,
 # e.g. DISCORD_MENTION_USER_ID for the Discord provider)
 maestro-relay send --agent <agent-id> --message "Build complete!" --mention
@@ -25,11 +28,11 @@ maestro-relay send --agent <agent-id> --message "Build complete!" --mention
 maestro-relay send --agent <agent-id> --message "Hello" --port 4000
 
 # Post a styled toast or flash notification
-maestro-relay notify toast --agent <id> --title "Deploy" --message "Done" --color green
+maestro-relay notify toast --agent <id> --provider discord --title "Deploy" --message "Done" --color green
 maestro-relay notify flash --agent <id> --message "Tests passing" --color green
 
 # Post the agent's current status (pulls from `maestro-cli show agent --json`)
-maestro-relay status --agent <id>
+maestro-relay status --agent <id> --provider discord
 ```
 
 If the agent doesn't have a connected channel yet, one is auto-created.
@@ -92,7 +95,7 @@ Returns `503` with `"status":"not_ready"` if no provider is connected.
 | Status | Meaning                                                        |
 | ------ | -------------------------------------------------------------- |
 | `200`  | Success                                                        |
-| `400`  | Missing/invalid fields, malformed JSON, or unknown `provider`  |
+| `400`  | Missing/invalid fields, malformed JSON, or unknown `provider` |
 | `404`  | Agent not found in Maestro                                     |
 | `405`  | Method not allowed                                             |
 | `413`  | Request body exceeds 1 MB                                      |

@@ -17,7 +17,7 @@
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - A Discord application + bot token (if running the Discord provider)
 - [Maestro CLI](https://docs.runmaestro.ai/cli) on your `PATH`
 
@@ -73,6 +73,7 @@ The legacy `maestro-discord` binary is registered as an alias to the same JS, so
 | systemd user / launchd agent  | Auto-start unit                          |
 
 Override any of these with `MAESTRO_RELAY_HOME`, `XDG_CONFIG_HOME`, or `MAESTRO_RELAY_BIN_DIR`. Pin a specific version with `MAESTRO_RELAY_VERSION=v1.0.0`.
+Choose a provider module at install time via `MAESTRO_RELAY_MODULE` (currently only `discord` is supported).
 
 ## Install (development from source)
 
@@ -124,14 +125,14 @@ npm run dev
 
 ### Install maestro-relay CLI (dev)
 
-The `maestro-discord` CLI lets your Maestro agents reach out to you on Discord — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
+The `maestro-relay` CLI lets your Maestro agents reach out to your chat provider — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
 
 After building the project (`npm run build`), create a shell wrapper.
 
 macOS / Linux:
 
 ```bash
-printf '#!/bin/bash\nnode "%s/dist/cli/maestro-relay.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
+printf '#!/bin/bash\nnode "%s/dist/cli/maestro-relay.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-relay && sudo chmod +x /usr/local/bin/maestro-relay
 ```
 
 Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user `PATH`:
@@ -143,7 +144,7 @@ New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 @"
 @echo off
 node "$repoPath\dist\cli\maestro-relay.js" %*
-"@ | Out-File -FilePath "$binDir\maestro-discord.cmd" -Encoding ASCII
+"@ | Out-File -FilePath "$binDir\maestro-relay.cmd" -Encoding ASCII
 
 # Add $binDir to user PATH if it isn't already (restart your shell afterwards)
 $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')

@@ -1,6 +1,6 @@
 # Agent Guide
 
-This repo is **Maestro Relay** — a chat-platform-to-Maestro bridge built around a provider-agnostic kernel. Discord is the first provider; Slack/Teams plug in alongside it without touching the kernel. CLAUDE.md is a symlink to this file.
+This repo is **Maestro Relay** — a chat-platform-to-Maestro bridge built around a provider-agnostic kernel. Discord is the first provider; Slack/Teams plug in alongside it without touching the kernel. `CLAUDE.md` is a symlink to this file.
 
 ## Development workflow
 
@@ -60,6 +60,12 @@ Local API on `127.0.0.1:API_PORT` (default 3457). See [docs/api.md](docs/api.md)
 2. Register the provider name in `src/core/providers.ts` (`loadProvider` switch).
 3. Add a section to `.env.example` for the provider's credentials.
 4. Provider modules own their own DB tables, command surface, and event handling; the kernel only sees `IncomingMessage` and calls back via `BridgeProvider.send` / `react` / `sendTyping`.
+
+## Installer module switch
+
+- `install.sh` supports `MAESTRO_RELAY_MODULE` (fallback `MAESTRO_BRIDGE_MODULE`), currently accepting only `discord`.
+- Keep installer module selection aligned with runtime `ENABLED_PROVIDERS` and CLI `--provider` support.
+- When adding a provider, update installer validation/prompting and `maestro-relay-ctl deploy` routing so deploy behavior is module-aware.
 
 ## Project notes
 

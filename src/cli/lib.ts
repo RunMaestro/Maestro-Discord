@@ -8,6 +8,7 @@ export interface SendApiPayload {
   agentId: string;
   message: string;
   mention?: boolean;
+  provider?: string;
 }
 
 export interface SendApiResult {
