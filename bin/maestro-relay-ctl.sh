@@ -148,6 +148,8 @@ cmd_deploy() {
   [ -f "$env_file" ] || die "Config missing: $env_file"
   local enabled_providers
   enabled_providers="$(sed -nE 's/^[[:space:]]*ENABLED_PROVIDERS[[:space:]]*=[[:space:]]*([^#[:space:]]+).*$/\1/p' "$env_file" | head -n1)"
+  enabled_providers="${enabled_providers#\"}"; enabled_providers="${enabled_providers%\"}"
+  enabled_providers="${enabled_providers#\'}"; enabled_providers="${enabled_providers%\'}"
   [ -z "$enabled_providers" ] && enabled_providers="discord"
   case ",$enabled_providers," in
     *,discord,*) (cd "$INSTALL_DIR" && node dist/providers/discord/deploy.js) ;;

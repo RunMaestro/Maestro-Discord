@@ -289,6 +289,8 @@ deploy_commands() {
   fi
   local enabled_providers
   enabled_providers="$(sed -nE 's/^[[:space:]]*ENABLED_PROVIDERS[[:space:]]*=[[:space:]]*([^#[:space:]]+).*$/\1/p' "$env_file" | head -n1)"
+  enabled_providers="${enabled_providers#\"}"; enabled_providers="${enabled_providers%\"}"
+  enabled_providers="${enabled_providers#\'}"; enabled_providers="${enabled_providers%\'}"
   if [ -z "$enabled_providers" ]; then
     enabled_providers="discord"
   fi
