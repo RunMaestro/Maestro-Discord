@@ -1,6 +1,6 @@
 # Agent Guide
 
-This repo is **Maestro Bridge** — a chat-platform-to-Maestro bridge built around a provider-agnostic kernel. Discord is the first provider; Slack/Teams plug in alongside it without touching the kernel. CLAUDE.md is a symlink to this file.
+This repo is **Maestro Relay** — a chat-platform-to-Maestro bridge built around a provider-agnostic kernel. Discord is the first provider; Slack/Teams plug in alongside it without touching the kernel. CLAUDE.md is a symlink to this file.
 
 ## Development workflow
 
@@ -40,11 +40,11 @@ This repo is **Maestro Bridge** — a chat-platform-to-Maestro bridge built arou
 
 ### CLI
 
-- `src/cli/maestro-bridge.ts` — verb dispatcher (`send`, `notify`, `status`)
+- `src/cli/maestro-relay.ts` — verb dispatcher (`send`, `notify`, `status`)
 - `src/cli/lib.ts` — shared HTTP client for `/api/send`
 - `src/cli/verbs/` — individual verb implementations
 
-The `maestro-discord` binary is registered as an alias of `maestro-bridge` for back-compat.
+The `maestro-discord` binary is registered as an alias of `maestro-relay` for back-compat.
 
 ### Entry point
 

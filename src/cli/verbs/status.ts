@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi, runMaestroCli } from '../lib';
 
-export const statusUsage = `Usage: maestro-bridge status --agent <id> [--port <number>]
+export const statusUsage = `Usage: maestro-relay status --agent <id> [--port <number>]
 
 Fetch agent details from maestro-cli and post a formatted status summary to
 the agent's bridge channel.

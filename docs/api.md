@@ -1,8 +1,8 @@
-# Maestro Bridge HTTP API
+# Maestro Relay HTTP API
 
-Maestro agents can push messages into chat using the `maestro-bridge` CLI (or any HTTP client). The bridge exposes a local HTTP API on `127.0.0.1:API_PORT` (default 3457).
+Maestro agents can push messages into chat using the `maestro-relay` CLI (or any HTTP client). The bridge exposes a local HTTP API on `127.0.0.1:API_PORT` (default 3457).
 
-The legacy binary name `maestro-discord` is preserved as an alias of `maestro-bridge` and is fully equivalent.
+The legacy binary name `maestro-discord` is preserved as an alias of `maestro-relay` and is fully equivalent.
 
 ## Setup
 
@@ -10,26 +10,26 @@ The API server starts automatically with the bridge. Port is configurable via `A
 
 ## CLI usage
 
-`maestro-discord` is verb-based. Run `maestro-discord --help` for the full
-list, or `maestro-discord <verb> --help` for verb-specific options.
+`maestro-relay` is verb-based. Run `maestro-relay --help` for the full
+list, or `maestro-relay <verb> --help` for verb-specific options.
 
 ```bash
 # Send a message to an agent's bridge channel (default provider: discord)
-maestro-bridge send --agent <agent-id> --message "Hello from Maestro"
+maestro-relay send --agent <agent-id> --message "Hello from Maestro"
 
 # Send with @mention (uses the provider's configured mention target,
 # e.g. DISCORD_MENTION_USER_ID for the Discord provider)
-maestro-bridge send --agent <agent-id> --message "Build complete!" --mention
+maestro-relay send --agent <agent-id> --message "Build complete!" --mention
 
 # Use a custom port
-maestro-bridge send --agent <agent-id> --message "Hello" --port 4000
+maestro-relay send --agent <agent-id> --message "Hello" --port 4000
 
 # Post a styled toast or flash notification
-maestro-bridge notify toast --agent <id> --title "Deploy" --message "Done" --color green
-maestro-bridge notify flash --agent <id> --message "Tests passing" --color green
+maestro-relay notify toast --agent <id> --title "Deploy" --message "Done" --color green
+maestro-relay notify flash --agent <id> --message "Tests passing" --color green
 
 # Post the agent's current status (pulls from `maestro-cli show agent --json`)
-maestro-bridge status --agent <id>
+maestro-relay status --agent <id>
 ```
 
 If the agent doesn't have a connected channel yet, one is auto-created.

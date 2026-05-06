@@ -1,38 +1,42 @@
 #!/usr/bin/env bash
-# Service wrapper for the Maestro Bridge.
+# Service wrapper for the Maestro Relay.
 # Subcommands: start | stop | restart | status | logs | deploy | update | uninstall | version
 #
-# Backwards-compat: legacy MAESTRO_DISCORD_* env vars are accepted as fallback.
-# A legacy install at ~/.local/share/maestro-discord is auto-detected when
+# Backwards-compat: legacy MAESTRO_BRIDGE_* / MAESTRO_DISCORD_* env vars are accepted as fallback.
+# A legacy install at ~/.local/share/maestro-bridge or ~/.local/share/maestro-discord is auto-detected when
 # the new install dir doesn't exist.
 
 set -euo pipefail
 
-# Resolve install paths with MAESTRO_DISCORD_* fallback for back-compat.
-INSTALL_DIR="${MAESTRO_BRIDGE_HOME:-${MAESTRO_DISCORD_HOME:-}}"
+# Resolve install paths with MAESTRO_BRIDGE_* / MAESTRO_DISCORD_* fallback for back-compat.
+INSTALL_DIR="${MAESTRO_RELAY_HOME:-${MAESTRO_BRIDGE_HOME:-${MAESTRO_DISCORD_HOME:-}}}"
 if [ -z "$INSTALL_DIR" ]; then
-  if [ -d "$HOME/.local/share/maestro-bridge" ]; then
+  if [ -d "$HOME/.local/share/maestro-relay" ]; then
+    INSTALL_DIR="$HOME/.local/share/maestro-relay"
+  elif [ -d "$HOME/.local/share/maestro-bridge" ]; then
     INSTALL_DIR="$HOME/.local/share/maestro-bridge"
   elif [ -d "$HOME/.local/share/maestro-discord" ]; then
     INSTALL_DIR="$HOME/.local/share/maestro-discord"
   else
-    INSTALL_DIR="$HOME/.local/share/maestro-bridge"
+    INSTALL_DIR="$HOME/.local/share/maestro-relay"
   fi
 fi
 
 XDG_CONFIG_PARENT="${XDG_CONFIG_HOME:-$HOME/.config}"
-if [ -d "$XDG_CONFIG_PARENT/maestro-bridge" ]; then
+if [ -d "$XDG_CONFIG_PARENT/maestro-relay" ]; then
+  CONFIG_DIR="$XDG_CONFIG_PARENT/maestro-relay"
+elif [ -d "$XDG_CONFIG_PARENT/maestro-bridge" ]; then
   CONFIG_DIR="$XDG_CONFIG_PARENT/maestro-bridge"
 elif [ -d "$XDG_CONFIG_PARENT/maestro-discord" ]; then
   CONFIG_DIR="$XDG_CONFIG_PARENT/maestro-discord"
 else
-  CONFIG_DIR="$XDG_CONFIG_PARENT/maestro-bridge"
+  CONFIG_DIR="$XDG_CONFIG_PARENT/maestro-relay"
 fi
 
-BIN_DIR="${MAESTRO_BRIDGE_BIN_DIR:-${MAESTRO_DISCORD_BIN_DIR:-$HOME/.local/bin}}"
-REPO="${MAESTRO_BRIDGE_REPO:-${MAESTRO_DISCORD_REPO:-RunMaestro/Maestro-Bridge}}"
-SERVICE_NAME="maestro-bridge"
-LAUNCHD_LABEL="sh.maestro.bridge"
+BIN_DIR="${MAESTRO_RELAY_BIN_DIR:-${MAESTRO_BRIDGE_BIN_DIR:-${MAESTRO_DISCORD_BIN_DIR:-$HOME/.local/bin}}}"
+REPO="${MAESTRO_RELAY_REPO:-${MAESTRO_BRIDGE_REPO:-${MAESTRO_DISCORD_REPO:-RunMaestro/Maestro-Relay}}}"
+SERVICE_NAME="maestro-relay"
+LAUNCHD_LABEL="sh.maestro.relay"
 LAUNCHD_PLIST="$HOME/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
 # Legacy names — used by uninstall to clean up after a v0.0.x install.
 LEGACY_SERVICE_NAME="maestro-discord"
@@ -52,26 +56,27 @@ detect_os() {
 
 usage() {
   cat <<'EOF'
-maestro-bridge-ctl — control the Maestro Bridge service.
-(Alias: maestro-discord-ctl, preserved for back-compat.)
+maestro-relay-ctl — control the Maestro Relay service.
+(Aliases: maestro-bridge-ctl and maestro-discord-ctl, preserved for back-compat.)
 
 Usage:
-  maestro-bridge-ctl <command>
+  maestro-relay-ctl <command>
 
 Commands:
-  start       Start the bridge service
-  stop        Stop the bridge service
-  restart     Restart the bridge service
+  start       Start the relay service
+  stop        Stop the relay service
+  restart     Restart the relay service
   status      Show service status
   logs        Tail service logs (Ctrl+C to stop)
   deploy      Deploy slash commands to Discord
   update      Reinstall the latest release (preserves config)
-  uninstall   Remove the bridge, service files, and CLI symlink
+  uninstall   Remove the relay, service files, and CLI symlinks
   version     Print installed version
 
 Environment:
-  MAESTRO_BRIDGE_HOME    Override install dir  (default: ~/.local/share/maestro-bridge)
+  MAESTRO_RELAY_HOME    Override install dir  (default: ~/.local/share/maestro-relay)
   XDG_CONFIG_HOME        Config dir parent     (default: ~/.config)
+  MAESTRO_BRIDGE_HOME    Accepted as fallback for back-compat
   MAESTRO_DISCORD_HOME   Accepted as fallback for back-compat with v0.0.x
 EOF
 }
@@ -127,7 +132,7 @@ cmd_logs() {
   case "$(detect_os)" in
     linux) journalctl --user -u "$SERVICE_NAME" -f --no-pager ;;
     macos)
-      local log_file="$INSTALL_DIR/logs/maestro-bridge.log"
+      local log_file="$INSTALL_DIR/logs/maestro-relay.log"
       mkdir -p "$INSTALL_DIR/logs"
       [ -f "$log_file" ] || touch "$log_file"
       tail -f "$log_file"
@@ -150,9 +155,9 @@ cmd_update() {
   config_parent="$(dirname "$CONFIG_DIR")"
   curl -fsSL "https://raw.githubusercontent.com/${REPO}/${tag}/install.sh" \
     | env \
-        MAESTRO_BRIDGE_HOME="$INSTALL_DIR" \
-        MAESTRO_BRIDGE_BIN_DIR="$BIN_DIR" \
-        MAESTRO_BRIDGE_REPO="$REPO" \
+        MAESTRO_RELAY_HOME="$INSTALL_DIR" \
+        MAESTRO_RELAY_BIN_DIR="$BIN_DIR" \
+        MAESTRO_RELAY_REPO="$REPO" \
         XDG_CONFIG_HOME="$config_parent" \
         bash
 }
@@ -169,6 +174,8 @@ cmd_uninstall() {
       systemctl --user disable --now "$SERVICE_NAME" 2>/dev/null || true
       rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${SERVICE_NAME}.service"
       # Clean up legacy unit if present.
+      systemctl --user disable --now maestro-bridge 2>/dev/null || true
+      rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/maestro-bridge.service"
       systemctl --user disable --now "$LEGACY_SERVICE_NAME" 2>/dev/null || true
       rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${LEGACY_SERVICE_NAME}.service"
       systemctl --user daemon-reload || true
@@ -177,6 +184,10 @@ cmd_uninstall() {
       ;;
     macos)
       rm -f "$LAUNCHD_PLIST"
+      [ -f "$HOME/Library/LaunchAgents/sh.maestro.bridge.plist" ] && {
+        launchctl unload -w "$HOME/Library/LaunchAgents/sh.maestro.bridge.plist" 2>/dev/null || true
+        rm -f "$HOME/Library/LaunchAgents/sh.maestro.bridge.plist"
+      }
       [ -f "$LEGACY_LAUNCHD_PLIST" ] && {
         launchctl unload -w "$LEGACY_LAUNCHD_PLIST" 2>/dev/null || true
         rm -f "$LEGACY_LAUNCHD_PLIST"
@@ -184,6 +195,7 @@ cmd_uninstall() {
       ;;
   esac
   rm -rf "$INSTALL_DIR"
+  rm -f "$BIN_DIR/maestro-relay-ctl"
   rm -f "$BIN_DIR/maestro-bridge-ctl"
   rm -f "$BIN_DIR/maestro-discord-ctl"
   info "Uninstalled. Config preserved at $CONFIG_DIR (delete manually if desired)."

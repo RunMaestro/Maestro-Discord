@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi } from '../lib';
 
-export const notifyUsage = `Usage: maestro-bridge notify <toast|flash> [options]
+export const notifyUsage = `Usage: maestro-relay notify <toast|flash> [options]
 
 Post a styled notification message to an agent's bridge channel. Color maps
 to a leading emoji so the alert stands out from regular messages.

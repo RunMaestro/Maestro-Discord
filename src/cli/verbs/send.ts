@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { DEFAULT_PORT, fail, ok, parsePort, postToSendApi } from '../lib';
 
-export const sendUsage = `Usage: maestro-bridge send --agent <id> --message <text> [--mention] [--port <number>]
+export const sendUsage = `Usage: maestro-relay send --agent <id> --message <text> [--mention] [--port <number>]
 
 Send a message to an agent's bridge channel (auto-creates channel if needed).
 

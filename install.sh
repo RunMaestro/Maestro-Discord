@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
-# Maestro Bridge installer.
+# Maestro Relay installer.
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Bridge/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Relay/main/install.sh | bash
 # Re-run to upgrade to the latest release. Existing config is preserved.
 #
-# Legacy MAESTRO_DISCORD_* env vars are accepted as fallback so v0.0.x
+# Legacy MAESTRO_BRIDGE_* / MAESTRO_DISCORD_* env vars are accepted as fallback so v0.0.x
 # installs upgrading via `maestro-discord-ctl update` keep working.
 
 set -Eeuo pipefail
 
-# Resolve config with MAESTRO_DISCORD_* fallback for back-compat with v0.0.x.
-REPO="${MAESTRO_BRIDGE_REPO:-${MAESTRO_DISCORD_REPO:-RunMaestro/Maestro-Bridge}}"
-INSTALL_DIR="${MAESTRO_BRIDGE_HOME:-${MAESTRO_DISCORD_HOME:-$HOME/.local/share/maestro-bridge}}"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maestro-bridge"
-# If a legacy ~/.config/maestro-discord exists and the new dir doesn't, prefer
-# the legacy location so existing users don't lose their .env.
-if [ ! -d "$CONFIG_DIR" ] && [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/maestro-discord" ]; then
+# Resolve config with MAESTRO_BRIDGE_* / MAESTRO_DISCORD_* fallback for back-compat.
+REPO="${MAESTRO_RELAY_REPO:-${MAESTRO_BRIDGE_REPO:-${MAESTRO_DISCORD_REPO:-RunMaestro/Maestro-Relay}}}"
+INSTALL_DIR="${MAESTRO_RELAY_HOME:-${MAESTRO_BRIDGE_HOME:-${MAESTRO_DISCORD_HOME:-$HOME/.local/share/maestro-relay}}}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maestro-relay"
+# If a legacy config dir exists and the new dir doesn't, prefer legacy location.
+if [ ! -d "$CONFIG_DIR" ] && [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/maestro-bridge" ]; then
+  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maestro-bridge"
+elif [ ! -d "$CONFIG_DIR" ] && [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/maestro-discord" ]; then
   CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maestro-discord"
 fi
-BIN_DIR="${MAESTRO_BRIDGE_BIN_DIR:-${MAESTRO_DISCORD_BIN_DIR:-$HOME/.local/bin}}"
-VERSION="${MAESTRO_BRIDGE_VERSION:-${MAESTRO_DISCORD_VERSION:-latest}}"
+BIN_DIR="${MAESTRO_RELAY_BIN_DIR:-${MAESTRO_BRIDGE_BIN_DIR:-${MAESTRO_DISCORD_BIN_DIR:-$HOME/.local/bin}}}"
+VERSION="${MAESTRO_RELAY_VERSION:-${MAESTRO_BRIDGE_VERSION:-${MAESTRO_DISCORD_VERSION:-latest}}}"
 NODE_MIN_MAJOR=22
 RELEASE_BACKUP=""
 
@@ -104,7 +105,7 @@ sha256_of() {
 
 download_release() {
   local tag="$1" dest="$2"
-  local url="https://github.com/${REPO}/releases/download/${tag}/maestro-bridge-${tag}.tar.gz"
+  local url="https://github.com/${REPO}/releases/download/${tag}/maestro-relay-${tag}.tar.gz"
   local sha_url="${url}.sha256"
   info "Downloading ${tag} from ${url}"
   curl -fsSL "$url" -o "$dest" || die "Download failed: $url"
@@ -271,14 +272,14 @@ deploy_commands() {
   local env_file="$CONFIG_DIR/.env"
   if ! config_complete "$env_file"; then
     warn "Skipping slash command deployment — config at $env_file is incomplete or contains template values."
-    warn "Edit it and run 'maestro-bridge-ctl deploy' when ready."
+    warn "Edit it and run 'maestro-relay-ctl deploy' when ready."
     return
   fi
   info "Deploying slash commands to Discord"
   if (cd "$INSTALL_DIR" && node dist/providers/discord/deploy.js); then
     ok "Slash commands deployed"
   else
-    warn "Slash command deployment failed. Edit $env_file and re-run 'maestro-bridge-ctl deploy'."
+    warn "Slash command deployment failed. Edit $env_file and re-run 'maestro-relay-ctl deploy'."
   fi
 }
 
@@ -303,16 +304,16 @@ prompt_yes_no() {
 }
 
 setup_voice_choose_model() {
-  local model_env="${MAESTRO_BRIDGE_MODEL:-${MAESTRO_DISCORD_MODEL:-}}"
+  local model_env="${MAESTRO_RELAY_MODEL:-${MAESTRO_BRIDGE_MODEL:-${MAESTRO_DISCORD_MODEL:-}}}"
   if [ -n "$model_env" ]; then
     local m
     m="$(expand_tilde "$model_env")"
     if [ -f "$m" ]; then
       VOICE_MODEL="$m"
-      ok "Using existing model from MAESTRO_BRIDGE_MODEL: $m"
+      ok "Using existing model from MAESTRO_RELAY_* env var: $m"
       return 0
     else
-      warn "MAESTRO_BRIDGE_MODEL=$m not found — falling back to download"
+      warn "Configured model path ($m) not found — falling back to download"
     fi
   fi
 
@@ -374,7 +375,7 @@ setup_voice() {
     info "Voice transcription deps not on PATH — installing without voice"
     [ -z "$ffmpeg_path" ]  && warn "  ffmpeg not found"
     [ -z "$whisper_path" ] && warn "  whisper-cli not found"
-    warn "Install both, then run 'maestro-bridge-ctl update' to enable transcription."
+    warn "Install both, then run 'maestro-relay-ctl update' to enable transcription."
     return 0
   fi
 
@@ -382,7 +383,7 @@ setup_voice() {
   ok "Found whisper-cli: $whisper_path"
 
   local enable=0
-  local voice_env="${MAESTRO_BRIDGE_VOICE:-${MAESTRO_DISCORD_VOICE:-}}"
+  local voice_env="${MAESTRO_RELAY_VOICE:-${MAESTRO_BRIDGE_VOICE:-${MAESTRO_DISCORD_VOICE:-}}}"
   if [ "$voice_env" = "1" ]; then
     enable=1
   elif [ "$voice_env" = "0" ]; then
@@ -393,7 +394,7 @@ setup_voice() {
       enable=1
     fi
   else
-    info "Non-interactive shell — skipping voice setup (set MAESTRO_BRIDGE_VOICE=1 to opt in)"
+    info "Non-interactive shell — skipping voice setup (set MAESTRO_RELAY_VOICE=1 to opt in)"
   fi
 
   if [ "$enable" -ne 1 ]; then
@@ -409,14 +410,15 @@ setup_voice() {
 
 install_ctl() {
   mkdir -p "$BIN_DIR"
-  local ctl="$INSTALL_DIR/bin/maestro-bridge-ctl.sh"
+  local ctl="$INSTALL_DIR/bin/maestro-relay-ctl.sh"
   [ -f "$ctl" ] || die "Control script missing at $ctl"
   chmod +x "$ctl"
+  ln -sf "$ctl" "$BIN_DIR/maestro-relay-ctl"
   ln -sf "$ctl" "$BIN_DIR/maestro-bridge-ctl"
   # Backwards-compat alias for users with `maestro-discord-ctl` in muscle memory
   # or in scripts. Both point at the same wrapper.
   ln -sf "$ctl" "$BIN_DIR/maestro-discord-ctl"
-  ok "Installed maestro-bridge-ctl → $BIN_DIR/maestro-bridge-ctl (alias: maestro-discord-ctl)"
+  ok "Installed maestro-relay-ctl → $BIN_DIR/maestro-relay-ctl (aliases: maestro-bridge-ctl, maestro-discord-ctl)"
   case ":$PATH:" in
     *":$BIN_DIR:"*) : ;;
     *) warn "$BIN_DIR is not on your PATH. Add it to your shell profile." ;;
@@ -427,13 +429,13 @@ install_service_linux() {
   command -v systemctl >/dev/null 2>&1 || { warn "systemctl not found — skipping service install."; return; }
   local unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
   mkdir -p "$unit_dir"
-  local template="$INSTALL_DIR/templates/maestro-bridge.service"
+  local template="$INSTALL_DIR/templates/maestro-relay.service"
   [ -f "$template" ] || { warn "Service template missing at $template"; return; }
   sed \
     -e "s|@INSTALL_DIR@|$INSTALL_DIR|g" \
     -e "s|@CONFIG_DIR@|$CONFIG_DIR|g" \
     -e "s|@NODE_BIN@|$(command -v node)|g" \
-    "$template" > "$unit_dir/maestro-bridge.service"
+    "$template" > "$unit_dir/maestro-relay.service"
   # Disable+remove a legacy maestro-discord unit if present so we don't leave
   # two competing user services running on upgrade.
   if [ -f "$unit_dir/maestro-discord.service" ]; then
@@ -441,9 +443,14 @@ install_service_linux() {
     rm -f "$unit_dir/maestro-discord.service"
     info "Removed legacy systemd unit maestro-discord.service"
   fi
+  if [ -f "$unit_dir/maestro-bridge.service" ]; then
+    systemctl --user disable --now maestro-bridge 2>/dev/null || true
+    rm -f "$unit_dir/maestro-bridge.service"
+    info "Removed legacy systemd unit maestro-bridge.service"
+  fi
   systemctl --user daemon-reload || true
-  ok "Installed systemd unit → $unit_dir/maestro-bridge.service"
-  echo "    Enable on login:  systemctl --user enable --now maestro-bridge"
+  ok "Installed systemd unit → $unit_dir/maestro-relay.service"
+  echo "    Enable on login:  systemctl --user enable --now maestro-relay"
   echo "    (and optionally:  loginctl enable-linger \$USER)"
 }
 
@@ -451,21 +458,26 @@ install_service_macos() {
   local plist_dir="$HOME/Library/LaunchAgents"
   mkdir -p "$plist_dir"
   mkdir -p "$INSTALL_DIR/logs"
-  local template="$INSTALL_DIR/templates/sh.maestro.bridge.plist"
+  local template="$INSTALL_DIR/templates/sh.maestro.relay.plist"
   [ -f "$template" ] || { warn "Plist template missing at $template"; return; }
   sed \
     -e "s|@INSTALL_DIR@|$INSTALL_DIR|g" \
     -e "s|@CONFIG_DIR@|$CONFIG_DIR|g" \
     -e "s|@NODE_BIN@|$(command -v node)|g" \
-    "$template" > "$plist_dir/sh.maestro.bridge.plist"
+    "$template" > "$plist_dir/sh.maestro.relay.plist"
   # Unload+remove a legacy launchd plist if present.
   if [ -f "$plist_dir/sh.maestro.discord.plist" ]; then
     launchctl unload -w "$plist_dir/sh.maestro.discord.plist" 2>/dev/null || true
     rm -f "$plist_dir/sh.maestro.discord.plist"
     info "Removed legacy launchd plist sh.maestro.discord.plist"
   fi
-  ok "Installed launchd plist → $plist_dir/sh.maestro.bridge.plist"
-  echo "    Load at login:  launchctl load -w $plist_dir/sh.maestro.bridge.plist"
+  if [ -f "$plist_dir/sh.maestro.bridge.plist" ]; then
+    launchctl unload -w "$plist_dir/sh.maestro.bridge.plist" 2>/dev/null || true
+    rm -f "$plist_dir/sh.maestro.bridge.plist"
+    info "Removed legacy launchd plist sh.maestro.bridge.plist"
+  fi
+  ok "Installed launchd plist → $plist_dir/sh.maestro.relay.plist"
+  echo "    Load at login:  launchctl load -w $plist_dir/sh.maestro.relay.plist"
 }
 
 install_service() {
@@ -476,7 +488,7 @@ install_service() {
 }
 
 main() {
-  c_bold 'Maestro Bridge installer'
+  c_bold 'Maestro Relay installer'
   echo
   echo
 
@@ -506,8 +518,8 @@ main() {
   echo
   ok "$(c_bold 'Install complete') — version $(c_green "$tag")"
   echo
-  echo "  Start:  $(c_bold 'maestro-bridge-ctl start')"
-  echo "  Logs:   $(c_bold 'maestro-bridge-ctl logs')"
+  echo "  Start:  $(c_bold 'maestro-relay-ctl start')"
+  echo "  Logs:   $(c_bold 'maestro-relay-ctl logs')"
   echo "  Config: $CONFIG_DIR/.env"
   echo
 }

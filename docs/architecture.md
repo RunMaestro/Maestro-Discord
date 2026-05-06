@@ -1,6 +1,6 @@
 # Architecture
 
-Maestro Bridge is built around a **provider-agnostic kernel** plus pluggable **provider adapters**. The kernel handles queueing, agent dispatch, persistence, transcription, and the HTTP API; adapters translate platform events into a small set of kernel types and back out into platform actions.
+Maestro Relay is built around a **provider-agnostic kernel** plus pluggable **provider adapters**. The kernel handles queueing, agent dispatch, persistence, transcription, and the HTTP API; adapters translate platform events into a small set of kernel types and back out into platform actions.
 
 ## Kernel ↔ Provider contract
 
@@ -73,7 +73,7 @@ The schema upgrades on first start: legacy `agent_channels` (single-PK `channel_
 | `src/providers/discord/voice.ts`              | Discord voice-message detection                        |
 | `src/providers/discord/commands/`             | Slash command handlers                                 |
 | `src/providers/discord/deploy.ts`             | Registers slash commands with Discord API              |
-| `src/cli/maestro-bridge.ts`                   | CLI tool for agent → chat messaging                    |
+| `src/cli/maestro-relay.ts`                   | CLI tool for agent → chat messaging                    |
 | `src/index.ts`                                | Kernel orchestrator (entry point)                      |
 
 ## Adding a new provider

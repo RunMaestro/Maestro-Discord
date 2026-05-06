@@ -122,7 +122,7 @@ export async function transcribeVoiceAttachment(attachment: IncomingAttachment):
     );
   }
 
-  const tempDir = path.join(os.tmpdir(), `maestro-bridge-voice-${randomUUID()}`);
+  const tempDir = path.join(os.tmpdir(), `maestro-relay-voice-${randomUUID()}`);
   const inputPath = path.join(tempDir, 'input.ogg');
   const wavPath = path.join(tempDir, 'input.wav');
   const outputBase = path.join(tempDir, 'transcript');

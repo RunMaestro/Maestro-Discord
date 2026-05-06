@@ -1,8 +1,8 @@
-# Maestro Bridge
+# Maestro Relay
 
 [![Made with Maestro](https://raw.githubusercontent.com/RunMaestro/Maestro/main/docs/assets/made-with-maestro.svg)](https://github.com/RunMaestro/Maestro)
 
-**Maestro Bridge** connects chat platforms to [Maestro](https://runmaestro.ai) AI agents through `maestro-cli`. Discord ships in the box; Slack, Teams, and others can be added by dropping in a provider adapter — the kernel is provider-agnostic.
+**Maestro Relay** connects chat platforms to [Maestro](https://runmaestro.ai) AI agents through `maestro-cli`. Discord ships in the box; Slack, Teams, and others can be added by dropping in a provider adapter — the kernel is provider-agnostic.
 
 > **Migrating from `discord-maestro`?** Same codebase, new name. The legacy `maestro-discord` binary is preserved as an alias and all `DISCORD_*` env vars work unchanged. See "Migration" below.
 
@@ -21,16 +21,16 @@
 - A Discord application + bot token (if running the Discord provider)
 - [Maestro CLI](https://docs.runmaestro.ai/cli) on your `PATH`
 
-### Install the `maestro-bridge` CLI
+### Install the `maestro-relay` CLI
 
-The `maestro-bridge` CLI lets your Maestro agents reach out to chat — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
+The `maestro-relay` CLI lets your Maestro agents reach out to chat — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
 
 After building (`npm run build`), create a shell wrapper.
 
 macOS / Linux:
 
 ```bash
-printf '#!/bin/bash\nnode "%s/dist/cli/maestro-bridge.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-bridge && sudo chmod +x /usr/local/bin/maestro-bridge
+printf '#!/bin/bash\nnode "%s/dist/cli/maestro-relay.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-relay && sudo chmod +x /usr/local/bin/maestro-relay
 ```
 
 Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user `PATH`:
@@ -41,8 +41,8 @@ $binDir = "$env:USERPROFILE\bin"
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 @"
 @echo off
-node "$repoPath\dist\cli\maestro-bridge.js" %*
-"@ | Out-File -FilePath "$binDir\maestro-bridge.cmd" -Encoding ASCII
+node "$repoPath\dist\cli\maestro-relay.js" %*
+"@ | Out-File -FilePath "$binDir\maestro-relay.cmd" -Encoding ASCII
 
 # Add $binDir to user PATH if it isn't already (restart your shell afterwards)
 $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
@@ -54,11 +54,11 @@ if (-not ($userPath -split ';' -contains $binDir)) {
 Or use `npm link`:
 
 ```bash
-maestro-discord-ctl start     # boot the bot
-maestro-discord-ctl logs      # tail logs
-maestro-discord-ctl status    # service status
-maestro-discord-ctl update    # upgrade to latest release (preserves config)
-maestro-discord-ctl uninstall # remove install + service files
+maestro-relay-ctl start     # boot the bot
+maestro-relay-ctl logs      # tail logs
+maestro-relay-ctl status    # service status
+maestro-relay-ctl update    # upgrade to latest release (preserves config)
+maestro-relay-ctl uninstall # remove install + service files
 ```
 
 The legacy `maestro-discord` binary is registered as an alias to the same JS, so existing scripts keep working.
@@ -67,20 +67,20 @@ The legacy `maestro-discord` binary is registered as an alias to the same JS, so
 
 | Path                          | Purpose                                  |
 | ----------------------------- | ---------------------------------------- |
-| `~/.local/share/maestro-discord/` | Installed bot (built JS + dependencies) |
-| `~/.config/maestro-discord/.env`  | Configuration (preserved across updates) |
-| `~/.local/bin/maestro-discord-ctl` | Service control wrapper             |
+| `~/.local/share/maestro-relay/` | Installed bot (built JS + dependencies) |
+| `~/.config/maestro-relay/.env`  | Configuration (preserved across updates) |
+| `~/.local/bin/maestro-relay-ctl` | Service control wrapper             |
 | systemd user / launchd agent  | Auto-start unit                          |
 
-Override any of these with `MAESTRO_DISCORD_HOME`, `XDG_CONFIG_HOME`, or `MAESTRO_DISCORD_BIN_DIR`. Pin a specific version with `MAESTRO_DISCORD_VERSION=v1.0.0`.
+Override any of these with `MAESTRO_RELAY_HOME`, `XDG_CONFIG_HOME`, or `MAESTRO_RELAY_BIN_DIR`. Pin a specific version with `MAESTRO_RELAY_VERSION=v1.0.0`.
 
 ## Install (development from source)
 
 1. Clone and install:
 
 ```bash
-git clone https://github.com/RunMaestro/Maestro-Discord.git
-cd Maestro-Discord
+git clone https://github.com/RunMaestro/Maestro-Relay.git
+cd Maestro-Relay
 npm install
 ```
 
@@ -122,7 +122,7 @@ npm run deploy-commands
 npm run dev
 ```
 
-### Install maestro-discord CLI (dev)
+### Install maestro-relay CLI (dev)
 
 The `maestro-discord` CLI lets your Maestro agents reach out to you on Discord — for example, to ping you when a long-running task finishes. See [docs/api.md](docs/api.md) for usage.
 
@@ -131,7 +131,7 @@ After building the project (`npm run build`), create a shell wrapper.
 macOS / Linux:
 
 ```bash
-printf '#!/bin/bash\nnode "%s/dist/cli/maestro-discord.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
+printf '#!/bin/bash\nnode "%s/dist/cli/maestro-relay.js" "$@"\n' "$(pwd)" | sudo tee /usr/local/bin/maestro-discord && sudo chmod +x /usr/local/bin/maestro-discord
 ```
 
 Windows (PowerShell) — writes the wrapper to `%USERPROFILE%\bin` and adds it to your user `PATH`:
@@ -142,7 +142,7 @@ $binDir = "$env:USERPROFILE\bin"
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 @"
 @echo off
-node "$repoPath\dist\cli\maestro-discord.js" %*
+node "$repoPath\dist\cli\maestro-relay.js" %*
 "@ | Out-File -FilePath "$binDir\maestro-discord.cmd" -Encoding ASCII
 
 # Add $binDir to user PATH if it isn't already (restart your shell afterwards)
@@ -180,17 +180,17 @@ brew install ffmpeg whisper-cli
 
    On Linux/Windows, install ffmpeg via your package manager and either build `whisper-cli` from the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo (then symlink the binary into `~/.local/bin`) or use [Linuxbrew](https://docs.brew.sh/Homebrew-on-Linux).
 
-2. **Production install (curl one-liner)** — the installer detects `ffmpeg` + `whisper-cli` on `PATH` and asks whether to enable voice transcription. If you say yes, it asks whether you already have a `ggml-*.bin` model file — paste the absolute path to reuse it, or let it download `ggml-base.en.bin` (~142 MB) into `~/.local/share/maestro-discord/models/`. Resolved **absolute** paths are written into `~/.config/maestro-discord/.env`, so the systemd/launchd service finds them regardless of `PATH`.
+2. **Production install (curl one-liner)** — the installer detects `ffmpeg` + `whisper-cli` on `PATH` and asks whether to enable voice transcription. If you say yes, it asks whether you already have a `ggml-*.bin` model file — paste the absolute path to reuse it, or let it download `ggml-base.en.bin` (~142 MB) into `~/.local/share/maestro-relay/models/`. Resolved **absolute** paths are written into `~/.config/maestro-relay/.env`, so the systemd/launchd service finds them regardless of `PATH`.
 
    Non-interactive escape hatches:
 
    ```bash
-   MAESTRO_DISCORD_VOICE=1 \
-   MAESTRO_DISCORD_MODEL=/abs/path/to/ggml-base.en.bin \
-     bash -c "$(curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Discord/main/install.sh)"
+   MAESTRO_RELAY_VOICE=1 \
+   MAESTRO_RELAY_MODEL=/abs/path/to/ggml-base.en.bin \
+     bash -c "$(curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Relay/main/install.sh)"
    ```
 
-   `MAESTRO_DISCORD_VOICE=0` opts out; omitting `MAESTRO_DISCORD_MODEL` triggers the download.
+   `MAESTRO_RELAY_VOICE=0` opts out; omitting `MAESTRO_RELAY_MODEL` triggers the download.
 
 3. **Source install** (npm-based) — there's no wizard; download a model and set the paths yourself:
 
@@ -252,13 +252,13 @@ Mention the bot or run `/session new` in an agent channel to create a thread, th
 
 ## Agent → chat messaging
 
-Agents can push messages to chat via the `maestro-bridge` CLI / HTTP API. See [docs/api.md](docs/api.md) for usage, endpoints, and error codes.
+Agents can push messages to chat via the `maestro-relay` CLI / HTTP API. See [docs/api.md](docs/api.md) for usage, endpoints, and error codes.
 
 ## Migration from `discord-maestro`
 
 This project was renamed from `discord-maestro` / `Maestro-Discord`. To smooth upgrades:
 
-- The `maestro-discord` binary is preserved as an alias of `maestro-bridge`. Existing scripts that call `maestro-discord send …` keep working unchanged.
+- The `maestro-discord` binary is preserved as an alias of `maestro-relay`. Existing scripts that call `maestro-discord send …` keep working unchanged.
 - All `DISCORD_*` env vars are unchanged. New optional `ENABLED_PROVIDERS` defaults to `discord`.
 - The SQLite database upgrades automatically on first start: `agent_channels` gains a `provider` column (existing rows default to `discord`); `agent_threads` is renamed to `discord_agent_threads` with rows preserved. No manual migration needed.
 - The HTTP `/api/send` endpoint accepts an optional `provider` field that defaults to `discord`; existing callers are unaffected.

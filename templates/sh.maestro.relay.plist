@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>sh.maestro.bridge</string>
+  <string>sh.maestro.relay</string>
   <key>WorkingDirectory</key>
   <string>@INSTALL_DIR@</string>
   <key>ProgramArguments</key>
@@ -20,8 +20,8 @@
     <false/>
   </dict>
   <key>StandardOutPath</key>
-  <string>@INSTALL_DIR@/logs/maestro-bridge.log</string>
+  <string>@INSTALL_DIR@/logs/maestro-relay.log</string>
   <key>StandardErrorPath</key>
-  <string>@INSTALL_DIR@/logs/maestro-bridge.log</string>
+  <string>@INSTALL_DIR@/logs/maestro-relay.log</string>
 </dict>
 </plist>
