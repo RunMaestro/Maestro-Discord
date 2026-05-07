@@ -25,6 +25,7 @@ VERSION="${MAESTRO_RELAY_VERSION:-${MAESTRO_BRIDGE_VERSION:-${MAESTRO_DISCORD_VE
 MODULE="${MAESTRO_RELAY_MODULE:-${MAESTRO_BRIDGE_MODULE:-discord}}"
 NODE_MIN_MAJOR=22
 RELEASE_BACKUP=""
+RELEASE_TARBALL=""
 
 VOICE_FFMPEG=""
 VOICE_WHISPER=""
@@ -524,15 +525,15 @@ main() {
   check_node
   check_maestro_cli
 
-  local tag tarball
+  local tag
   tag="$(resolve_release)"
   info "Target release: ${tag}"
 
-  tarball="$(mktemp)"
-  trap 'rm -f "$tarball"' EXIT
-  download_release "$tag" "$tarball"
+  RELEASE_TARBALL="$(mktemp)"
+  trap 'rm -f "$RELEASE_TARBALL"' EXIT
+  download_release "$tag" "$RELEASE_TARBALL"
   trap 'rollback_install' ERR
-  install_release "$tag" "$tarball"
+  install_release "$tag" "$RELEASE_TARBALL"
   install_deps
   trap - ERR
   install_ctl
