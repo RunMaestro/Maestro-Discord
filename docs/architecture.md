@@ -34,6 +34,17 @@ The kernel speaks only in `IncomingMessage` / `OutgoingMessage` / `ChannelTarget
    - Persists the maestro session id on the first response via `conv.persistSession`
 5. Errors are logged to `logs/errors.log` and surfaced as a `⚠️` reply in the channel.
 
+## Message flow (Telegram)
+
+Telegram uses a **bot-per-agent** model: at install time the bot is bound to one Maestro agent (`TELEGRAM_AGENT_ID`) and one chat (`TELEGRAM_CHAT_ID`). One bot serves exactly one agent for its lifetime.
+
+1. **Forum mode**: user sends `/new` in the supergroup main feed → adapter calls `bot.api.createForumTopic`, registers the new topic in `telegram_agent_topics`, and treats that topic as one Maestro session. Subsequent messages in the topic are routed to that session.
+2. **DM mode**: the bound chat is a single shared session. `/new` clears the stored session id so the next message starts a fresh maestro session.
+3. Each message becomes an `IncomingMessage` with `channelId = chatId` (DM) or `chatId:topicId` (forum) and is passed to `ctx.enqueue`.
+4. The kernel queue serializes per `(provider, channelId)` exactly as for Discord — reactions/typing, `resolveConversation`, attachment download, `maestro.send`, response splitting, usage footer, session persistence.
+5. Outbound: `provider.send` posts via `bot.api.sendMessage`, attaching `message_thread_id` when the target is a forum topic. Long responses are split at the 4096-char Telegram message limit.
+6. `findOrCreateAgentChannel(agentId)` enforces the single-agent binding by throwing if `agentId !== TELEGRAM_AGENT_ID` — agent-initiated messages from `/api/send` for any other agent are rejected.
+
 ## Thread ownership (Discord)
 
 Each thread is bound to the user who created it (via mention or `/session new`).
@@ -52,6 +63,7 @@ Each thread is bound to the user who created it (via mention or `/session new`).
 | ------------------------- | --------------------- | --------------------------------------------------- |
 | `agent_channels`          | core                  | `(provider, channel_id)` → agent + session + flags  |
 | `discord_agent_threads`   | discord provider      | Thread → channel + agent + owner + session          |
+| `telegram_agent_topics`   | telegram provider     | `(chat_id, topic_id)` → agent + session             |
 
 The schema upgrades on first start: legacy `agent_channels` (single-PK `channel_id`) is rebuilt with composite PK `(provider, channel_id)` and existing rows defaulted to `discord`; legacy `agent_threads` is renamed to `discord_agent_threads`.
 
@@ -73,6 +85,13 @@ The schema upgrades on first start: legacy `agent_channels` (single-PK `channel_
 | `src/providers/discord/voice.ts`              | Discord voice-message detection                        |
 | `src/providers/discord/commands/`             | Slash command handlers                                 |
 | `src/providers/discord/deploy.ts`             | Registers slash commands with Discord API              |
+| `src/providers/telegram/adapter.ts`           | TelegramProvider implementing BridgeProvider           |
+| `src/providers/telegram/messageHandler.ts`    | Telegram update → IncomingMessage                      |
+| `src/providers/telegram/voice.ts`             | Telegram voice-message detection + download            |
+| `src/providers/telegram/topicsDb.ts`          | `telegram_agent_topics` accessor                       |
+| `src/providers/telegram/commands/`            | Slash command handlers (dispatched by messageHandler)  |
+| `src/providers/telegram/deploy.ts`            | Registers commands via `bot.api.setMyCommands`         |
+| `src/providers/telegram/config.ts`            | `TELEGRAM_*` env loading                               |
 | `src/cli/maestro-relay.ts`                   | CLI tool for agent → chat messaging                    |
 | `src/index.ts`                                | Kernel orchestrator (entry point)                      |
 
@@ -82,3 +101,4 @@ The schema upgrades on first start: legacy `agent_channels` (single-PK `channel_
 2. Add a `case '<name>'` branch to `loadProvider` in `src/core/providers.ts`.
 3. Document the provider's env vars in `.env.example`.
 4. Users opt in by setting `ENABLED_PROVIDERS=discord,<name>`.
+5. If your provider is bound to a single agent (like Telegram), enforce that in `findOrCreateAgentChannel` by throwing when the requested `agentId` doesn't match the bound one — this keeps `/api/send` from leaking cross-agent traffic into the wrong chat.
