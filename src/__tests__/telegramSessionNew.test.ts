@@ -75,14 +75,14 @@ function baseDeps(overrides: Partial<Parameters<typeof createMessageHandler>[0]>
   } as Parameters<typeof createMessageHandler>[0];
 }
 
-test('forum mode: /new creates a topic, registers it, replies in topic, and skips enqueue', async () => {
+test('forum mode: /session new creates a topic, registers it, replies in topic, and skips enqueue', async () => {
   const { bot, calls } = makeFakeBot({ newTopicId: 901 });
   let enqueued = 0;
   const handler = createMessageHandler(
     baseDeps({ bot, enqueue: () => (enqueued += 1) }),
   );
 
-  await handler(makeCtx('/new'));
+  await handler(makeCtx('/session new'));
 
   assert.equal(enqueued, 0, 'should not enqueue the slash command');
   const created = calls.find((c) => c.method === 'createForumTopic');
@@ -100,17 +100,7 @@ test('forum mode: /new creates a topic, registers it, replies in topic, and skip
   assert.equal(row!.agent_id, BOUND_AGENT);
 });
 
-test('forum mode: /session new also matches', async () => {
-  const { bot, calls } = makeFakeBot({ newTopicId: 902 });
-  const handler = createMessageHandler(baseDeps({ bot }));
-
-  await handler(makeCtx('/session new'));
-
-  const created = calls.find((c) => c.method === 'createForumTopic');
-  assert.ok(created, '/session new should also trigger topic creation');
-});
-
-test('dm mode: /new clears the bound channel session and replies', async () => {
+test('dm mode: /session new clears the bound channel session and replies', async () => {
   coreChannelDb.register('telegram', BOUND_CHAT, BOUND_AGENT, 'My Agent');
   coreChannelDb.updateSession('telegram', BOUND_CHAT, 'old-session-123');
   assert.equal(coreChannelDb.get('telegram', BOUND_CHAT)!.session_id, 'old-session-123');
@@ -121,7 +111,7 @@ test('dm mode: /new clears the bound channel session and replies', async () => {
     baseDeps({ bot, chatMode: 'dm', enqueue: () => (enqueued += 1) }),
   );
 
-  await handler(makeCtx('/new'));
+  await handler(makeCtx('/session new'));
 
   assert.equal(enqueued, 0, 'should not enqueue the slash command');
   const created = calls.find((c) => c.method === 'createForumTopic');
@@ -134,7 +124,7 @@ test('dm mode: /new clears the bound channel session and replies', async () => {
   assert.equal(coreChannelDb.get('telegram', BOUND_CHAT)!.session_id, null);
 });
 
-test('non-/new messages bypass session-new path', async () => {
+test('non-/ messages bypass dispatcher and are enqueued', async () => {
   coreChannelDb.register('telegram', BOUND_CHAT, BOUND_AGENT, 'My Agent');
 
   const { bot, calls } = makeFakeBot();
@@ -149,7 +139,7 @@ test('non-/new messages bypass session-new path', async () => {
   assert.equal(calls.length, 0, 'no telegram api calls for normal message');
 });
 
-test('/news (similar prefix) is not treated as /new', async () => {
+test('unknown slash command (/news today) falls through to enqueue', async () => {
   coreChannelDb.register('telegram', BOUND_CHAT, BOUND_AGENT, 'My Agent');
 
   const { bot, calls } = makeFakeBot();
@@ -160,6 +150,6 @@ test('/news (similar prefix) is not treated as /new', async () => {
 
   await handler(makeCtx('/news today'));
 
-  assert.equal(enqueued, 1, 'word-boundary on /new should let /news through');
+  assert.equal(enqueued, 1, 'unknown command should fall through to enqueue');
   assert.equal(calls.length, 0);
 });

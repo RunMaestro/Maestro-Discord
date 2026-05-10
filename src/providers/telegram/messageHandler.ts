@@ -4,8 +4,7 @@ import {
   isTranscriberAvailable,
   transcribeVoiceAttachment,
 } from '../../core/transcription';
-import { channelDb as coreChannelDb } from '../../core/db';
-import { topicDb } from './topicsDb';
+import { dispatchCommand } from './commands';
 import { attachmentsFromMessage, downloadVoice, isVoiceMessage } from './voice';
 
 type Enqueue = (msg: IncomingMessage, options?: EnqueueOptions) => void;
@@ -25,8 +24,6 @@ export type MessageHandlerDeps = {
   isTranscriberAvailable: typeof isTranscriberAvailable;
   logger?: Pick<Console, 'warn' | 'error'>;
 };
-
-const SESSION_NEW_PATTERN = /^\/(session\s+new|new)\b/;
 
 export function createMessageHandler(deps: MessageHandlerDeps) {
   return async function handleMessage(ctx: GrammyContext): Promise<void> {
@@ -48,13 +45,33 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       }
 
       const text = message.text ?? '';
-      if (SESSION_NEW_PATTERN.test(text)) {
-        await handleSessionNew(deps);
-        return;
-      }
-
       const threadId = message.message_thread_id;
       const isThread = !!message.is_topic_message && typeof threadId === 'number';
+
+      if (text.trimStart().startsWith('/')) {
+        const boundAgentName = await deps.resolveAgentName();
+        const reply = async (replyText: string) => {
+          await deps.bot.api.sendMessage(
+            deps.boundChatId,
+            replyText,
+            isThread && threadId !== undefined
+              ? { message_thread_id: threadId }
+              : {},
+          );
+        };
+        const handled = await dispatchCommand(text, {
+          bot: deps.bot,
+          chatId: deps.boundChatId,
+          threadId: isThread ? threadId : undefined,
+          fromUserId: String(from.id),
+          boundAgentId: deps.boundAgentId,
+          boundAgentName,
+          chatMode: deps.chatMode,
+          reply,
+        });
+        if (handled) return;
+      }
+
       const channelId = isThread ? `${chat.id}:${threadId}` : `${chat.id}`;
 
       let content = message.text ?? message.caption ?? '';
@@ -95,25 +112,4 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       log('[telegram] messageHandler', err);
     }
   };
-}
-
-async function handleSessionNew(deps: MessageHandlerDeps): Promise<void> {
-  if (deps.chatMode === 'forum') {
-    const agentName = await deps.resolveAgentName();
-    const topicName = `${agentName} session ${new Date().toISOString().slice(0, 16)}`;
-    const created = await deps.bot.api.createForumTopic(deps.boundChatId, topicName);
-    topicDb.register(created.message_thread_id, deps.boundChatId, deps.boundAgentId);
-    await deps.bot.api.sendMessage(
-      deps.boundChatId,
-      'Started a new session in this topic. Send a message to begin.',
-      { message_thread_id: created.message_thread_id },
-    );
-    return;
-  }
-
-  coreChannelDb.updateSession('telegram', deps.boundChatId, null);
-  await deps.bot.api.sendMessage(
-    deps.boundChatId,
-    'Started a new session. Send a message to begin.',
-  );
 }
