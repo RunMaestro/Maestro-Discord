@@ -217,6 +217,16 @@ write_config() {
     return
   fi
 
+  MODULE="$(normalize_module "$MODULE")"
+  case "$MODULE" in
+    discord)  write_config_discord "$env_file" ;;
+    telegram) write_config_telegram "$env_file" ;;
+  esac
+}
+
+write_config_discord() {
+  local env_file="$1"
+
   local interactive=0
   [ -r /dev/tty ] && interactive=1
   local have_required=0
@@ -241,7 +251,6 @@ write_config() {
     info "Writing config from environment to $env_file"
   fi
   local token client_id guild_id allowed
-  MODULE="$(normalize_module "$MODULE")"
   token="$(prompt_var DISCORD_BOT_TOKEN 'Discord bot token')"
   client_id="$(prompt_var DISCORD_CLIENT_ID 'Discord application (client) ID')"
   guild_id="$(prompt_var DISCORD_GUILD_ID 'Discord guild (server) ID')"
@@ -266,6 +275,15 @@ write_config() {
   mv "$tmp_env" "$env_file"
   ln -sf "$env_file" "$INSTALL_DIR/.env"
   ok "Wrote $env_file"
+}
+
+write_config_telegram() {
+  local env_file="$1"
+  # Full interactive walkthrough lands in the next TG-07 task.
+  warn "Telegram interactive config not yet implemented — writing template to $env_file (edit before starting)"
+  cp "$INSTALL_DIR/.env.example" "$env_file"
+  chmod 600 "$env_file"
+  ln -sf "$env_file" "$INSTALL_DIR/.env"
 }
 
 config_complete() {
