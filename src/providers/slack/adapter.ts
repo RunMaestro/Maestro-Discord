@@ -217,7 +217,11 @@ export class SlackProvider implements BridgeProvider {
         return;
       }
 
-      // Strip bot mention from text
+      // Strip all Slack user mentions before forwarding to the agent.
+      // The bot's own mention is the trigger that brought us here, and
+      // other users' mentions would just surface as opaque <@U123> tokens
+      // to the agent — Slack still notifies those users via the original
+      // message, so dropping them from the agent-bound text is safe.
       const cleanText = text.replace(/<@[^>]+>/g, '').trim();
       if (!cleanText) {
         await say('I received your mention, but no message. Please include a message.');
