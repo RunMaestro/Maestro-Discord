@@ -38,6 +38,7 @@ export class TelegramProvider implements BridgeProvider {
   private ctx: KernelContext | null = null;
   private ready = false;
   private chatMode: 'forum' | 'dm' = 'dm';
+  private agentNameCache = new Map<string, string>();
 
   async start(ctx: KernelContext): Promise<void> {
     this.ctx = ctx;
@@ -159,8 +160,61 @@ export class TelegramProvider implements BridgeProvider {
     }
   }
 
-  async findOrCreateAgentChannel(_agentId: string): Promise<AgentChannelInfo> {
-    throw new Error('not implemented in TG-02');
+  async findOrCreateAgentChannel(agentId: string): Promise<AgentChannelInfo> {
+    if (!this.bot) throw new Error('telegram bot not started');
+    if (agentId !== telegramConfig.agentId) {
+      throw new Error(
+        `Telegram bot is bound to agent ${telegramConfig.agentId}; cannot serve agent ${agentId}. ` +
+          `Run a separate bridge instance for that agent.`,
+      );
+    }
+
+    const agentName = (await this.resolveAgentName(agentId)) ?? agentId;
+
+    if (this.chatMode === 'forum') {
+      const topics = topicDb.getByAgentId(agentId);
+      let topicId: number;
+      if (topics.length === 0) {
+        const created = await this.bot.api.createForumTopic(
+          telegramConfig.chatId,
+          `${agentName} (default)`,
+        );
+        topicId = created.message_thread_id;
+        topicDb.register(topicId, telegramConfig.chatId, agentId);
+      } else {
+        topicId = topics[0].topic_id;
+      }
+      return {
+        channelId: `${telegramConfig.chatId}:${topicId}`,
+        agentId,
+        agentName,
+      };
+    }
+
+    return {
+      channelId: telegramConfig.chatId,
+      agentId,
+      agentName,
+    };
+  }
+
+  private async resolveAgentName(agentId: string): Promise<string | null> {
+    const cached = this.agentNameCache.get(agentId);
+    if (cached) return cached;
+    try {
+      const agents = await maestro.listAgents();
+      const match = agents.find((a) => a.id === agentId);
+      if (match?.name) {
+        this.agentNameCache.set(agentId, match.name);
+        return match.name;
+      }
+      return null;
+    } catch (err) {
+      console.warn(
+        `[telegram] resolveAgentName: maestro-cli unavailable (${(err as Error).message})`,
+      );
+      return null;
+    }
   }
 
   async react(target: MessageTarget, emoji: string): Promise<ReactionHandle> {
