@@ -50,16 +50,16 @@ The Slack adapter loads its config lazily, so a deployment that disables Slack (
 
 ## Slash commands
 
-| Command                                    | Description                                                                                                |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `/health`                                  | Verify the relay process is healthy                                                                        |
-| `/agents list`                             | Show all available Maestro agents                                                                          |
-| `/agents new <agent-id>`                   | Create (or reopen) a dedicated public channel `#maestro-<agent-name>` and register it for the agent        |
-| `/agents disconnect [agent-id]`            | (Run inside an agent channel) Unregister the binding and archive the channel                               |
-| `/agents readonly <agent-id> <on\|off>`    | Toggle read-only mode for the current agent channel                                                        |
-| `/session new [name]`                      | Post a parent message in the current agent channel and bind a new owner-scoped thread to the invoking user |
+| Command                          | Description                                                                                                |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `/health`                        | Verify the relay process is healthy                                                                        |
+| `/agents list`                   | Show all available Maestro agents                                                                          |
+| `/agents new <agent-id>`         | Create (or reopen) a dedicated public channel `#maestro-<agent-name>` and register it for the agent        |
+| `/agents disconnect [agent-id]`  | (Run inside an agent channel) Unregister the binding and archive the channel                               |
+| `/agents readonly <on\|off>`     | (Run inside an agent channel) Toggle read-only mode for the bound agent                                    |
+| `/session new [name]`            | Post a parent message in the current agent channel and bind a new owner-scoped thread to the invoking user |
 
-> **Discord parity note:** the Slack `/agents readonly` command currently requires the agent ID as the first argument (Discord reads it from the bound channel). Track [TODO] for unification — until then, copy the ID from `/agents list`.
+The Slack provider deliberately ships a smaller command surface than Discord — the playbook, gist, notes, and auto-run flows are Discord-only today.
 
 ## Runtime behavior
 

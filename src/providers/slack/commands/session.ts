@@ -3,6 +3,7 @@ import { WebClient } from '@slack/web-api';
 import { slackConfig } from '../config';
 import { channelDb } from '../channelsDb';
 import { conversationDb } from '../conversationsDb';
+import { logger } from '../../../core/logger';
 
 export async function handle({
   ack,
@@ -28,6 +29,7 @@ export async function handle({
         await say(`Unknown subcommand: \`${subcommand}\`. Try: \`new [session-name]\``);
     }
   } catch (err) {
+    void logger.error('slack/session', err instanceof Error ? err.message : String(err));
     await say('Failed to execute session command.');
   }
 }

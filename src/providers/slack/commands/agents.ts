@@ -4,6 +4,7 @@ import { slackConfig } from '../config';
 import { channelDb } from '../channelsDb';
 import { conversationDb } from '../conversationsDb';
 import { maestro } from '../../../core/maestro';
+import { logger } from '../../../core/logger';
 
 export async function handle({
   ack,
@@ -29,7 +30,7 @@ export async function handle({
         await handleDisconnect(say, command.channel_id, args[0]);
         break;
       case 'readonly':
-        await handleReadonly(say, command.channel_id, args[0], args[1]);
+        await handleReadonly(say, command.channel_id, args[0]);
         break;
       case 'list':
       case '':
@@ -42,7 +43,7 @@ export async function handle({
         );
     }
   } catch (err) {
-    console.error('[slack/agents] command failed:', err);
+    void logger.error('slack/agents', err instanceof Error ? err.message : String(err));
     await say('Failed to execute agents command.');
   }
 }
@@ -74,7 +75,7 @@ async function handleList(say: SayFn): Promise<void> {
     type: 'section',
     text: {
       type: 'mrkdwn',
-      text: '*Register an agent:* `/agents new <agent-id>`\n*Unregister:* `/agents disconnect <agent-id>`\n*Toggle read-only:* `/agents readonly <agent-id> <on|off>`',
+      text: '*Register an agent:* `/agents new <agent-id>`\n*Unregister (run inside the agent channel):* `/agents disconnect`\n*Toggle read-only (run inside the agent channel):* `/agents readonly <on|off>`',
     },
   });
 
@@ -125,7 +126,10 @@ async function handleNew(
       isArchived = existing.is_archived ?? false;
     }
   } catch (err) {
-    console.error('[slack/agents] conversations.list failed:', err);
+    void logger.error(
+      'slack/agents:conversations.list',
+      err instanceof Error ? err.message : String(err),
+    );
     // ignore — will create below
   }
 
@@ -203,29 +207,17 @@ async function handleDisconnect(
 async function handleReadonly(
   say: SayFn,
   channelId: string,
-  agentId: string | undefined,
   mode: string | undefined,
 ): Promise<void> {
-  if (!agentId || !mode) {
-    await say('Usage: `/agents readonly <agent-id> <on|off>`');
-    return;
-  }
-
   const existing = channelDb.get(channelId);
-
   if (!existing) {
     await say('No agent is registered in this channel.');
     return;
   }
 
-  if (existing.agent_id !== agentId) {
-    await say(`Agent \`${agentId}\` is not registered in this channel.`);
-    return;
-  }
-
-  const normalized = mode.toLowerCase();
+  const normalized = mode?.toLowerCase();
   if (normalized !== 'on' && normalized !== 'off') {
-    await say('Usage: `/agents readonly <agent-id> <on|off>`');
+    await say('Usage: `/agents readonly <on|off>`');
     return;
   }
   const readOnly = normalized === 'on';
