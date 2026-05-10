@@ -9,6 +9,7 @@
 ## Features
 
 - Provider-pluggable kernel — Discord today, Slack/Teams next
+- Telegram support (forum topics or DM)
 - Creates dedicated channels for Maestro agents
 - Per-user session threads (`/session new` or by mentioning the bot)
 - Per-conversation FIFO queue with typing/reaction indicators
@@ -18,7 +19,7 @@
 ## Prerequisites
 
 - Node.js 22+
-- A Discord application + bot token (if running the Discord provider)
+- A Discord application + bot token (if running the Discord provider), or a Telegram bot token via [@BotFather](https://t.me/BotFather) (if running the Telegram provider)
 - [Maestro CLI](https://docs.runmaestro.ai/cli) on your `PATH`
 
 ## Install (production one-liner)
@@ -49,7 +50,7 @@ The legacy aliases `maestro-bridge-ctl` and `maestro-discord-ctl` still work for
 | systemd user / launchd agent  | Auto-start unit                          |
 
 Override any of these with `MAESTRO_RELAY_HOME`, `XDG_CONFIG_HOME`, or `MAESTRO_RELAY_BIN_DIR`. Pin a specific version with `MAESTRO_RELAY_VERSION=v1.0.0`.
-Choose a provider module at install time via `MAESTRO_RELAY_MODULE` (currently only `discord` is supported).
+Choose a provider module at install time via `MAESTRO_RELAY_MODULE=discord` or `MAESTRO_RELAY_MODULE=telegram`.
 
 ## Install (development from source)
 
@@ -71,7 +72,7 @@ Set these values in `.env`:
 
 ```
 # Core
-ENABLED_PROVIDERS=discord    # comma-separated; default 'discord'
+ENABLED_PROVIDERS=discord    # comma-separated; default 'discord' (e.g. 'telegram' or 'discord,telegram')
 API_PORT=3457                # optional, default 3457
 
 # Discord provider
@@ -80,6 +81,14 @@ DISCORD_CLIENT_ID=           # Application ID from Discord Developer Portal
 DISCORD_GUILD_ID=            # Your server's ID (right-click server → Copy ID)
 DISCORD_ALLOWED_USER_IDS=123,456   # Optional: comma-separated allowed user IDs
 DISCORD_MENTION_USER_ID=     # Optional: user ID to @mention when --mention is used
+
+# Telegram provider (only loaded if 'telegram' is in ENABLED_PROVIDERS)
+# Setup walkthrough: see docs/telegram-setup.md
+# TELEGRAM_BOT_TOKEN=          # from @BotFather (https://t.me/BotFather → /newbot)
+# TELEGRAM_CHAT_ID=            # supergroup ID (negative, e.g. -1001234567890) or DM chat ID
+# TELEGRAM_AGENT_ID=           # the Maestro agent this bot is bound to (one bot = one agent)
+# TELEGRAM_ALLOWED_USER_IDS=   # comma-separated Telegram user IDs allowed to interact with the bot
+# TELEGRAM_MENTION_USER_ID=    # optional: Telegram user ID to @mention when --mention is used
 
 # Voice transcription (optional)
 FFMPEG_PATH=/opt/homebrew/bin/ffmpeg
@@ -192,6 +201,18 @@ npm run build && node --test --experimental-test-coverage dist/__tests__/**/*.te
 | `/gist`                    | Publish the current agent's session transcript as a GitHub gist |
 | `/notes synopsis`          | Post an AI-generated synopsis of recent activity              |
 | `/notes history`           | Post a unified history feed across agents                     |
+
+## Telegram
+
+Bot-per-agent model: each Telegram bot represents one Maestro agent. Recommended setup is a forum supergroup where each session becomes its own topic; DM mode is supported for single-session use.
+
+### Quick start
+
+```bash
+MAESTRO_RELAY_MODULE=telegram bash -c "$(curl -fsSL https://raw.githubusercontent.com/RunMaestro/Maestro-Relay/main/install.sh)"
+```
+
+The full newcomer walkthrough — creating a bot via @BotFather, picking a chat, collecting the IDs the installer asks for — lives in [docs/telegram-setup.md](docs/telegram-setup.md).
 
 ## How it works
 
