@@ -12,7 +12,7 @@ if you've used Telegram as a chat app, you have everything you need.
   - A **forum supergroup** where each Maestro session becomes its own topic
     (recommended; mirrors how Discord channels + threads feel), OR
   - A **private DM** with the bot (simpler; one running session at a time,
-    use `/new` to reset).
+    use `/session new` to reset).
 
 One bot is bound to one agent for its lifetime. To bridge multiple agents,
 create one bot per agent (BotFather makes this cheap — see "Multiple agents"
@@ -49,7 +49,7 @@ Choose **Option A** (forum supergroup) for the smoothest experience, or
 
 Forum supergroups let each Maestro session live in its own _topic_, similar to
 how Discord uses channels + threads. You'll be able to start fresh sessions
-with `/new` without losing previous conversations.
+with `/session new` without losing previous conversations.
 
 1. In Telegram, tap the menu and choose **New Group**. Add at least one other
    contact (you can remove them after creating the group) — Telegram requires
@@ -124,10 +124,11 @@ maestro-relay-ctl logs
 
 In your Telegram chat:
 
-- **Forum mode**: send `/new` in the supergroup's main feed — a new topic
-  appears. Send messages inside that topic to talk to the agent. Run `/new`
-  again to start another session in a fresh topic.
-- **DM mode**: just send a message. `/new` resets the session in place.
+- **Forum mode**: send `/session new` in the supergroup's main feed — a new
+  topic appears. Send messages inside that topic to talk to the agent. Run
+  `/session new` again to start another session in a fresh topic.
+- **DM mode**: just send a message. `/session new` resets the session in
+  place.
 
 Try `/health` to confirm the bridge is reaching `maestro-cli`.
 

@@ -38,8 +38,8 @@ The kernel speaks only in `IncomingMessage` / `OutgoingMessage` / `ChannelTarget
 
 Telegram uses a **bot-per-agent** model: at install time the bot is bound to one Maestro agent (`TELEGRAM_AGENT_ID`) and one chat (`TELEGRAM_CHAT_ID`). One bot serves exactly one agent for its lifetime.
 
-1. **Forum mode**: user sends `/new` in the supergroup main feed → adapter calls `bot.api.createForumTopic`, registers the new topic in `telegram_agent_topics`, and treats that topic as one Maestro session. Subsequent messages in the topic are routed to that session.
-2. **DM mode**: the bound chat is a single shared session. `/new` clears the stored session id so the next message starts a fresh maestro session.
+1. **Forum mode**: user sends `/session new` in the supergroup main feed → adapter calls `bot.api.createForumTopic`, registers the new topic in `telegram_agent_topics`, and treats that topic as one Maestro session. Subsequent messages in the topic are routed to that session.
+2. **DM mode**: the bound chat is a single shared session. `/session new` clears the stored session id so the next message starts a fresh maestro session.
 3. Each message becomes an `IncomingMessage` with `channelId = chatId` (DM) or `chatId:topicId` (forum) and is passed to `ctx.enqueue`.
 4. The kernel queue serializes per `(provider, channelId)` exactly as for Discord — reactions/typing, `resolveConversation`, attachment download, `maestro.send`, response splitting, usage footer, session persistence.
 5. Outbound: `provider.send` posts via `bot.api.sendMessage`, attaching `message_thread_id` when the target is a forum topic. Long responses are split at the 4096-char Telegram message limit.
