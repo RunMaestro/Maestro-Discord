@@ -182,21 +182,33 @@ export function createQueue(deps: QueueDeps) {
         // ignore cleanup failure
       }
 
-      if (!result.success || !result.response) {
-        const reason = result.error ?? 'The agent could not complete this request.';
+      if (result.response) {
+        if (!result.success) {
+          // Agent produced a response but session ended with an error (e.g. a hook failure).
+          // Log it but don't surface the raw error to the user.
+          void deps.logger.error(
+            'queue:agent-soft-failure',
+            `agent=${conv.agentId} session=${conv.sessionId ?? 'new'} channel=${message.channelId} error=${result.error}`,
+          );
+        }
+        const parts = split(result.response);
+        for (const part of parts) {
+          await provider.send(target, { text: part });
+        }
+      } else {
+        const rawReason = result.error ?? 'The agent could not complete this request.';
+        // Strip verbose hook scripts from user-visible errors.
+        const reason = /hook\b.*\bfailed/i.test(rawReason)
+          ? 'The agent session ended with a hook error. Check logs for details.'
+          : rawReason;
         const hint = conv.readOnly
           ? '\n-# The agent is in **read-only** mode and cannot modify files.'
           : '';
         void deps.logger.error(
           'queue:agent-failure',
-          `agent=${conv.agentId} session=${conv.sessionId ?? 'new'} channel=${message.channelId} reason=${reason}`,
+          `agent=${conv.agentId} session=${conv.sessionId ?? 'new'} channel=${message.channelId} reason=${rawReason}`,
         );
         await provider.send(target, { text: `⚠️ ${reason}${hint}` });
-      } else {
-        const parts = split(result.response);
-        for (const part of parts) {
-          await provider.send(target, { text: part });
-        }
       }
 
       const cost = (result.usage?.totalCostUsd ?? 0).toFixed(4);
