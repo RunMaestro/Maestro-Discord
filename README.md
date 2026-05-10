@@ -270,5 +270,16 @@ Without this the bot will fail to connect with a "Used disallowed intents" error
 
 ## Troubleshooting
 
+### Discord
+
 - If `/health` fails, ensure `maestro-cli` is on your `PATH`.
 - If commands don’t appear, re-run `npm run deploy-commands` after updating your bot or application settings.
+
+### Telegram
+
+See [docs/telegram-setup.md](docs/telegram-setup.md) for the full walkthrough. Common pitfalls:
+
+- **Bot doesn't reply in a forum supergroup**: confirm the bot is an admin with the **Manage Topics** permission. Without it, the bridge cannot create forum topics and the call fails silently.
+- **"Telegram bot is bound to agent X; cannot serve agent Y" in logs**: `maestro-relay send --agent Y --provider telegram` was called against a bot bound to a different agent. Use the bridge for agent Y instead, or run a second bridge instance for agent Y with its own bot.
+- **No reactions appear (⏳)**: Telegram only allows a curated set of emoji reactions on messages. The bridge falls back gracefully — typing indicators continue to work even if the reaction emoji isn't accepted in your chat type.
+- **Voice messages aren't transcribed**: confirm `ffmpeg` and `whisper-cli` are on your `PATH` and `WHISPER_MODEL_PATH` points at a real model file. Same setup as the Discord provider's voice support.
