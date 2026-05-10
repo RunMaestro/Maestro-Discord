@@ -95,11 +95,13 @@ async function handleNew(
     return;
   }
 
+  // Lookup mirrors Discord's /agents new: exact id, id-prefix, or exact name.
+  // Keeping the two providers identical here means agent IDs/names that work
+  // in one chat platform work in the other.
   const agents = await maestro.listAgents();
-  let agent = agents.find((a) => a.id === agentId);
-  if (!agent) {
-    agent = agents.find((a) => a.name.toLowerCase() === agentId.toLowerCase());
-  }
+  const agent = agents.find(
+    (a) => a.id === agentId || a.id.startsWith(agentId) || a.name === agentId,
+  );
   if (!agent) {
     await say(`Agent \`${agentId}\` not found. Use \`/agents list\` to see available agents.`);
     return;

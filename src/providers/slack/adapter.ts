@@ -324,7 +324,14 @@ export class SlackProvider implements BridgeProvider {
     if (isThreadTs(target.channelId)) {
       // target is a thread_ts — look up parent channel
       const convo = conversationDb.get(target.channelId);
-      if (!convo) throw new Error(`No conversation found for thread_ts ${target.channelId}`);
+      if (!convo) {
+        // The thread is orphaned — its row was likely removed when the
+        // bound channel was disconnected, or the DB was reset. Log the
+        // mismatch specifically so operators can distinguish it from
+        // generic Slack/network errors before surfacing to the kernel.
+        void logger.error('slack/send:orphan-thread', `thread_ts=${target.channelId}`);
+        throw new Error(`No conversation found for thread_ts ${target.channelId}`);
+      }
       await this.client.chat.postMessage({
         channel: convo.channel_id,
         thread_ts: target.channelId,
@@ -344,7 +351,10 @@ export class SlackProvider implements BridgeProvider {
 
     if (isThreadTs(target.channelId)) {
       const convo = conversationDb.get(target.channelId);
-      if (!convo) throw new Error(`No conversation found for thread_ts ${target.channelId}`);
+      if (!convo) {
+        void logger.error('slack/react:orphan-thread', `thread_ts=${target.channelId}`);
+        throw new Error(`No conversation found for thread_ts ${target.channelId}`);
+      }
       channel = convo.channel_id;
       timestamp = target.messageId;
     } else {
