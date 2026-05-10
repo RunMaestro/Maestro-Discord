@@ -88,7 +88,8 @@ normalize_module() {
   raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
   case "$raw" in
     discord|'') echo "discord" ;;
-    *) die "Unsupported module/provider: $raw (supported today: discord)" ;;
+    telegram)   echo "telegram" ;;
+    *) die "Unsupported module/provider: $raw (supported: discord, telegram)" ;;
   esac
 }
 
