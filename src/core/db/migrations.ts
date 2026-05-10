@@ -8,6 +8,7 @@ import type Database from 'better-sqlite3';
  *  2. Add `owner_user_id` to agent_threads (legacy)
  *  3. Add `provider` column + composite PK (provider, channel_id) to agent_channels
  *  4. Rename `agent_threads` → `discord_agent_threads`
+ *  5. Add `slack_agent_conversations` thread/timestamp registry
  */
 export function runMigrations(db: Database.Database): void {
   ensureReadOnlyColumn(db);
