@@ -367,6 +367,88 @@ write_config_telegram() {
   ok "Wrote $env_file"
 }
 
+pick_telegram_agent() {
+  if [ -n "${TELEGRAM_AGENT_ID:-}" ]; then
+    echo "$TELEGRAM_AGENT_ID"
+    return
+  fi
+  if ! command -v maestro-cli >/dev/null 2>&1; then
+    warn "maestro-cli not found on PATH — type the Maestro agent ID manually."
+    prompt_var TELEGRAM_AGENT_ID 'Maestro agent ID'
+    return
+  fi
+
+  local json
+  json="$(maestro-cli list agents --json 2>/dev/null || echo '[]')"
+
+  local parsed=""
+  if command -v jq >/dev/null 2>&1; then
+    parsed="$(printf '%s' "$json" | jq -r '.[] | (.id + "\t" + (.name // "(unnamed)"))' 2>/dev/null || true)"
+  else
+    parsed="$(printf '%s' "$json" | node -e '
+let s = "";
+process.stdin.on("data", d => s += d);
+process.stdin.on("end", () => {
+  try {
+    const a = JSON.parse(s);
+    if (!Array.isArray(a)) return;
+    for (const x of a) {
+      process.stdout.write((x.id || "") + "\t" + (x.name || "(unnamed)") + "\n");
+    }
+  } catch (e) {}
+});
+' 2>/dev/null || true)"
+  fi
+
+  if [ -z "$parsed" ]; then
+    warn "No Maestro agents available — type the agent ID manually."
+    prompt_var TELEGRAM_AGENT_ID 'Maestro agent ID'
+    return
+  fi
+
+  local i=0
+  local -a ids=()
+  printf '    Available Maestro agents:\n' >&2
+  while IFS=$'\t' read -r id name; do
+    [ -z "$id" ] && continue
+    i=$((i + 1))
+    ids+=("$id")
+    printf '      %d) %s  (id: %s)\n' "$i" "$name" "$id" >&2
+  done <<< "$parsed"
+
+  if [ "$i" -eq 0 ]; then
+    warn "No Maestro agents parsed — type the agent ID manually."
+    prompt_var TELEGRAM_AGENT_ID 'Maestro agent ID'
+    return
+  fi
+
+  local choice=""
+  if [ -r /dev/tty ]; then
+    read -r -p "  Pick an agent by number (or paste an agent ID): " choice </dev/tty || true
+  fi
+
+  if [ -z "$choice" ]; then
+    warn "No selection made — type the agent ID manually."
+    prompt_var TELEGRAM_AGENT_ID 'Maestro agent ID'
+    return
+  fi
+
+  case "$choice" in
+    ''|*[!0-9]*)
+      # Non-numeric input — treat as a raw agent ID
+      echo "$choice"
+      ;;
+    *)
+      if [ "$choice" -ge 1 ] && [ "$choice" -le "$i" ]; then
+        echo "${ids[$((choice - 1))]}"
+      else
+        warn "Selection out of range — using the entered value as a raw agent ID."
+        echo "$choice"
+      fi
+      ;;
+  esac
+}
+
 config_complete() {
   local file="$1" key value
   [ -f "$file" ] || return 1
