@@ -22,6 +22,10 @@ async function loadProvider(name: string): Promise<BridgeProvider | null> {
       const { DiscordProvider } = await import('../providers/discord/adapter');
       return new DiscordProvider();
     }
+    case 'slack': {
+      const { SlackProvider } = await import('../providers/slack/adapter');
+      return new SlackProvider();
+    }
     case 'telegram': {
       const { TelegramProvider } = await import('../providers/telegram/adapter');
       return new TelegramProvider();

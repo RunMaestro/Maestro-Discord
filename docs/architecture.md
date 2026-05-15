@@ -97,8 +97,4 @@ The schema upgrades on first start: legacy `agent_channels` (single-PK `channel_
 
 ## Adding a new provider
 
-1. Create `src/providers/<name>/adapter.ts` exporting a class implementing `BridgeProvider`.
-2. Add a `case '<name>'` branch to `loadProvider` in `src/core/providers.ts`.
-3. Document the provider's env vars in `.env.example`.
-4. Users opt in by setting `ENABLED_PROVIDERS=discord,<name>`.
-5. If your provider is bound to a single agent (like Telegram), enforce that in `findOrCreateAgentChannel` by throwing when the requested `agentId` doesn't match the bound one — this keeps `/api/send` from leaking cross-agent traffic into the wrong chat.
+See [AGENTS-providers.md](../AGENTS-providers.md) (also linked as [CLAUDE-providers.md](../CLAUDE-providers.md)) for the full provider-development guide: kernel/provider contract, file-layout convention, DB and env conventions, voice-transcription integration, and a shipping checklist.

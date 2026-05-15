@@ -8,7 +8,8 @@ import type Database from 'better-sqlite3';
  *  2. Add `owner_user_id` to agent_threads (legacy)
  *  3. Add `provider` column + composite PK (provider, channel_id) to agent_channels
  *  4. Rename `agent_threads` → `discord_agent_threads`
- *  5. Create `telegram_agent_topics` for forum-topic-per-session tracking
+ *  5. Add `slack_agent_conversations` thread/timestamp registry
+ *  6. Create `telegram_agent_topics` for forum-topic-per-session tracking
  */
 export function runMigrations(db: Database.Database): void {
   ensureReadOnlyColumn(db);
@@ -17,6 +18,7 @@ export function runMigrations(db: Database.Database): void {
   ensureDiscordThreadsTable(db);
   ensureTelegramTopicsTable(db);
   ensureOwnerUserIdColumn(db);
+  ensureSlackConversationsTable(db);
 }
 
 export function ensureOwnerUserIdColumn(database: Database.Database): void {
@@ -113,6 +115,19 @@ function ensureDiscordThreadsTable(database: Database.Database): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS discord_agent_threads (
       thread_id     TEXT PRIMARY KEY,
+      channel_id    TEXT NOT NULL,
+      agent_id      TEXT NOT NULL,
+      owner_user_id TEXT,
+      session_id    TEXT,
+      created_at    INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+}
+
+function ensureSlackConversationsTable(database: Database.Database): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS slack_agent_conversations (
+      thread_ts     TEXT PRIMARY KEY,
       channel_id    TEXT NOT NULL,
       agent_id      TEXT NOT NULL,
       owner_user_id TEXT,
