@@ -353,7 +353,7 @@ write_config_telegram() {
   local env_file="$1"
 
   local interactive=0
-  [ -r /dev/tty ] && interactive=1
+  can_read_tty && interactive=1
   local have_required=0
   if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] \
      && [ -n "${TELEGRAM_CHAT_ID:-}" ] \
@@ -495,7 +495,7 @@ process.stdin.on("end", () => {
   fi
 
   local choice=""
-  if [ -r /dev/tty ]; then
+  if can_read_tty; then
     read -r -p "  Pick an agent by number (or paste an agent ID): " choice </dev/tty || true
   fi
 
@@ -521,7 +521,7 @@ process.stdin.on("end", () => {
           return
         fi
         warn "Selection out of range (pick 1-$i, or paste an agent ID)."
-        if [ -r /dev/tty ]; then
+        if can_read_tty; then
           read -r -p "  Re-pick: " choice </dev/tty || choice=""
           if [ -z "$choice" ]; then
             warn "No selection made — type the agent ID manually."
@@ -539,24 +539,33 @@ process.stdin.on("end", () => {
 }
 
 config_complete() {
-  local file="$1" key value enabled
+  local file="$1" key value enabled provider
   [ -f "$file" ] || return 1
   enabled="$(sed -nE 's/^[[:space:]]*ENABLED_PROVIDERS[[:space:]]*=[[:space:]]*([^#[:space:]]+).*$/\1/p' "$file" | head -n1)"
   enabled="${enabled#\"}"; enabled="${enabled%\"}"
   enabled="${enabled#\'}"; enabled="${enabled%\'}"
   [ -n "$enabled" ] || enabled="discord"
+  # Validate EVERY enabled provider's required env vars, not just the first
+  # match — multi-provider deployments like ENABLED_PROVIDERS=discord,telegram
+  # must have credentials for both.
+  local IFS=','
   local -a required_keys=()
-  case ",$enabled," in
-    *,telegram,*)
-      required_keys=(TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_AGENT_ID)
-      ;;
-    *,slack,*)
-      required_keys=(SLACK_BOT_TOKEN SLACK_SIGNING_SECRET SLACK_TEAM_ID SLACK_APP_ID)
-      ;;
-    *)
-      required_keys=(DISCORD_BOT_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID)
-      ;;
-  esac
+  for provider in $enabled; do
+    provider="${provider// /}"
+    case "$provider" in
+      telegram)
+        required_keys+=(TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_AGENT_ID)
+        ;;
+      slack)
+        required_keys+=(SLACK_BOT_TOKEN SLACK_SIGNING_SECRET SLACK_TEAM_ID SLACK_APP_ID)
+        ;;
+      discord|'')
+        required_keys+=(DISCORD_BOT_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID)
+        ;;
+      *) return 1 ;;
+    esac
+  done
+  unset IFS
   for key in "${required_keys[@]}"; do
     value="$(sed -nE "s/^${key}=([^#[:space:]]+).*/\1/p" "$file" | head -n1)"
     [ -n "$value" ] || return 1

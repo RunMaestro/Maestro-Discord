@@ -143,24 +143,33 @@ cmd_logs() {
 }
 
 config_complete() {
-  local file="$1" key value
+  local file="$1" key value enabled_providers provider
   [ -f "$file" ] || return 1
-  local enabled_module
-  enabled_module="$(sed -nE 's/^[[:space:]]*ENABLED_PROVIDERS[[:space:]]*=[[:space:]]*([^#[:space:]]+).*/\1/p' "$file" | head -n1)"
-  enabled_module="${enabled_module#\"}"; enabled_module="${enabled_module%\"}"
-  enabled_module="${enabled_module#\'}"; enabled_module="${enabled_module%\'}"
-  local required_keys
-  case ",$enabled_module," in
-    *,telegram,*)
-      required_keys="TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_AGENT_ID"
-      ;;
-    *,slack,*)
-      required_keys="SLACK_BOT_TOKEN SLACK_SIGNING_SECRET SLACK_TEAM_ID SLACK_APP_ID"
-      ;;
-    *)
-      required_keys="DISCORD_BOT_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID"
-      ;;
-  esac
+  enabled_providers="$(sed -nE 's/^[[:space:]]*ENABLED_PROVIDERS[[:space:]]*=[[:space:]]*([^#[:space:]]+).*/\1/p' "$file" | head -n1)"
+  enabled_providers="${enabled_providers#\"}"; enabled_providers="${enabled_providers%\"}"
+  enabled_providers="${enabled_providers#\'}"; enabled_providers="${enabled_providers%\'}"
+  [ -n "$enabled_providers" ] || enabled_providers="discord"
+  # Validate every enabled provider's required env vars (split CSV), not just
+  # the first match — ENABLED_PROVIDERS=discord,telegram must pass only when
+  # both credential sets are present.
+  local IFS=','
+  local required_keys=""
+  for provider in $enabled_providers; do
+    provider="${provider// /}"
+    case "$provider" in
+      telegram)
+        required_keys="$required_keys TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_AGENT_ID"
+        ;;
+      slack)
+        required_keys="$required_keys SLACK_BOT_TOKEN SLACK_SIGNING_SECRET SLACK_TEAM_ID SLACK_APP_ID"
+        ;;
+      discord|'')
+        required_keys="$required_keys DISCORD_BOT_TOKEN DISCORD_CLIENT_ID DISCORD_GUILD_ID"
+        ;;
+      *) return 1 ;;
+    esac
+  done
+  unset IFS
   for key in $required_keys; do
     value="$(sed -nE "s/^${key}=([^#[:space:]]+).*/\1/p" "$file" | head -n1)"
     [ -n "$value" ] || return 1
