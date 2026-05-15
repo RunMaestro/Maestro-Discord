@@ -29,7 +29,10 @@ import {
 
 function parseChannelId(channelId: string): { chatId: string; threadId?: number } {
   const [chatId, topicStr] = channelId.split(':');
-  return topicStr ? { chatId, threadId: Number(topicStr) } : { chatId };
+  if (!topicStr || !/^-?\d+$/.test(topicStr)) return { chatId };
+  const threadId = Number(topicStr);
+  if (!Number.isFinite(threadId)) return { chatId };
+  return { chatId, threadId };
 }
 
 export class TelegramProvider implements BridgeProvider {
@@ -64,7 +67,8 @@ export class TelegramProvider implements BridgeProvider {
       );
     }
 
-    if (!coreChannelDb.get('telegram', chatId)) {
+    const existing = coreChannelDb.get('telegram', chatId);
+    if (!existing || existing.agent_id !== agentId) {
       let agentName = agentId;
       try {
         const agents = await maestro.listAgents();
@@ -74,6 +78,13 @@ export class TelegramProvider implements BridgeProvider {
         console.warn(
           `[telegram] could not resolve agent name from maestro-cli; falling back to agent id (${(err as Error).message})`,
         );
+      }
+      if (existing && existing.agent_id !== agentId) {
+        console.warn(
+          `[telegram] bound channel ${chatId} was registered to agent ${existing.agent_id}; ` +
+            `reconciling to ${agentId} (TELEGRAM_AGENT_ID changed). Forum topics from the previous binding are left in place but will no longer resolve.`,
+        );
+        coreChannelDb.remove('telegram', chatId);
       }
       coreChannelDb.register('telegram', chatId, agentId, agentName);
       console.log(
@@ -98,12 +109,17 @@ export class TelegramProvider implements BridgeProvider {
     });
     bot.on('message', handler);
 
-    // Long-polling runs forever; do not await.
-    void bot.start({
-      onStart: () => {
-        this.ready = true;
-      },
-    });
+    // Long-polling runs forever; don't await, but surface failures.
+    bot
+      .start({
+        onStart: () => {
+          this.ready = true;
+        },
+      })
+      .catch((err) => {
+        this.ready = false;
+        console.error('[telegram] long-polling stopped with error:', err);
+      });
   }
 
   async stop(): Promise<void> {
@@ -174,6 +190,10 @@ export class TelegramProvider implements BridgeProvider {
     const agentName = (await this.resolveAgentName(agentId)) ?? agentId;
 
     if (this.chatMode === 'forum') {
+      // Use the oldest topic for this agent as the stable "default", or create
+      // one if none exist. `topicDb.getByAgentId` returns rows ordered by
+      // created_at ascending so topics[0] is the original/default topic — not
+      // the most recently created.
       const topics = topicDb.getByAgentId(agentId);
       let topicId: number;
       if (topics.length === 0) {

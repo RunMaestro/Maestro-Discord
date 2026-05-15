@@ -10,8 +10,11 @@ export interface TelegramAgentTopic {
 
 export const topicDb = {
   register(topicId: number, chatId: string, agentId: string): void {
+    // Idempotent: ignore conflicts on (chat_id, topic_id) so reprocessing the
+    // same forum topic doesn't throw. created_at is preserved from the first
+    // insert via INSERT OR IGNORE.
     db.prepare(
-      `INSERT INTO telegram_agent_topics (topic_id, chat_id, agent_id, created_at)
+      `INSERT OR IGNORE INTO telegram_agent_topics (topic_id, chat_id, agent_id, created_at)
        VALUES (?, ?, ?, ?)`,
     ).run(topicId, chatId, agentId, Date.now());
   },
@@ -23,8 +26,11 @@ export const topicDb = {
   },
 
   getByAgentId(agentId: string): TelegramAgentTopic[] {
+    // ORDER BY created_at ASC so topics[0] is the original/default topic for
+    // the agent. findOrCreateAgentChannel relies on this ordering to return a
+    // stable channelId for /api/send.
     return db
-      .prepare('SELECT * FROM telegram_agent_topics WHERE agent_id = ? ORDER BY created_at DESC')
+      .prepare('SELECT * FROM telegram_agent_topics WHERE agent_id = ? ORDER BY created_at ASC')
       .all(agentId) as TelegramAgentTopic[];
   },
 

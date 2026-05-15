@@ -47,6 +47,12 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       const text = message.text ?? '';
       const threadId = message.message_thread_id;
       const isThread = !!message.is_topic_message && typeof threadId === 'number';
+      // In forum supergroups the "General" topic has no `message_thread_id`
+      // and is_topic_message is false. Topic-scoped messages have both set.
+      // We only route topic-scoped messages to maestro; General-feed messages
+      // are ignored (use `/session new` from anywhere to spawn a topic).
+      const isForumGeneralFeed =
+        deps.chatMode === 'forum' && !isThread;
 
       if (text.trimStart().startsWith('/')) {
         const boundAgentName = await deps.resolveAgentName();
@@ -70,6 +76,20 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
           reply,
         });
         if (handled) return;
+      }
+
+      // Drop non-command General-feed messages with a visible warning rather
+      // than failing silently downstream in resolveConversation. Users can
+      // start a topic via `/session new` (handled above before this point).
+      if (isForumGeneralFeed) {
+        const trimmed = (text || message.caption || '').trim();
+        if (trimmed.length > 0) {
+          const log = deps.logger?.warn ?? console.warn;
+          log(
+            `[telegram] ignoring message in supergroup General feed (chat=${chat.id}) — start a topic with /session new to chat with the agent`,
+          );
+        }
+        return;
       }
 
       const channelId = isThread ? `${chat.id}:${threadId}` : `${chat.id}`;

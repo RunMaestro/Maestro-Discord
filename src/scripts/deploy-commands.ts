@@ -7,13 +7,24 @@ const PROVIDER_DEPLOY_SCRIPTS: Record<string, string> = {
   telegram: path.resolve(__dirname, '..', 'providers', 'telegram', 'deploy.js'),
 };
 
+const KNOWN_PROVIDERS = new Set(['discord', 'slack', 'telegram']);
+
 function parseEnabledProviders(): string[] {
   const raw = process.env.ENABLED_PROVIDERS;
   if (!raw) return ['discord'];
-  return raw
+  const names = raw
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+  const unknown = names.filter((n) => !KNOWN_PROVIDERS.has(n));
+  if (unknown.length > 0) {
+    console.error(
+      `[deploy-commands] Unknown provider name(s) in ENABLED_PROVIDERS: ${unknown.join(', ')}. ` +
+        `Allowed: ${[...KNOWN_PROVIDERS].join(', ')}.`,
+    );
+    process.exit(1);
+  }
+  return names;
 }
 
 function runDeploy(provider: string, scriptPath: string): Promise<boolean> {

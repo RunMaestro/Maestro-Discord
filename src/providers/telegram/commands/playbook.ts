@@ -4,10 +4,51 @@ import type { TelegramCommandContext } from './types';
 export const command = 'playbook';
 export const description = 'Run and inspect Maestro playbooks';
 
-const pendingSelections = new Map<string, { playbooks: MaestroPlaybook[]; action: 'show' | 'run' }>();
+type PendingSelection = {
+  playbooks: MaestroPlaybook[];
+  action: 'show' | 'run';
+  ts: number;
+};
+
+const PENDING_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const PENDING_MAX_ENTRIES = 256;
+const pendingSelections = new Map<string, PendingSelection>();
 
 function selectionKey(ctx: TelegramCommandContext): string {
   return `${ctx.chatId}:${ctx.threadId ?? 0}:${ctx.fromUserId}`;
+}
+
+function pruneExpiredSelections(now: number = Date.now()): void {
+  for (const [key, value] of pendingSelections) {
+    if (now - value.ts > PENDING_TTL_MS) pendingSelections.delete(key);
+  }
+}
+
+function getActiveSelection(key: string): PendingSelection | undefined {
+  const value = pendingSelections.get(key);
+  if (!value) return undefined;
+  if (Date.now() - value.ts > PENDING_TTL_MS) {
+    pendingSelections.delete(key);
+    return undefined;
+  }
+  return value;
+}
+
+function setSelection(key: string, value: Omit<PendingSelection, 'ts'>): void {
+  pruneExpiredSelections();
+  if (pendingSelections.size >= PENDING_MAX_ENTRIES) {
+    // Evict the oldest entry.
+    let oldestKey: string | undefined;
+    let oldestTs = Infinity;
+    for (const [k, v] of pendingSelections) {
+      if (v.ts < oldestTs) {
+        oldestTs = v.ts;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) pendingSelections.delete(oldestKey);
+  }
+  pendingSelections.set(key, { ...value, ts: Date.now() });
 }
 
 export async function execute(ctx: TelegramCommandContext): Promise<void> {
@@ -62,7 +103,7 @@ async function handleList(ctx: TelegramCommandContext): Promise<void> {
     `Playbooks:\n${lines.join('\n')}\n\n` +
       'Reply with /playbook show <number> or /playbook run <number>.',
   );
-  pendingSelections.set(selectionKey(ctx), { playbooks, action: 'run' });
+  setSelection(selectionKey(ctx), { playbooks, action: 'run' });
 }
 
 async function handleShow(ctx: TelegramCommandContext): Promise<void> {
@@ -153,7 +194,7 @@ async function resolvePlaybookId(
   }
 
   if (/^\d+$/.test(arg)) {
-    const pending = pendingSelections.get(selectionKey(ctx));
+    const pending = getActiveSelection(selectionKey(ctx));
     if (!pending) {
       await ctx.reply(
         'No recent /playbook list to pick from. Run /playbook list first.',
@@ -174,7 +215,7 @@ async function handleNumberReply(
   ctx: TelegramCommandContext,
   num: number,
 ): Promise<void> {
-  const pending = pendingSelections.get(selectionKey(ctx));
+  const pending = getActiveSelection(selectionKey(ctx));
   if (!pending) {
     await ctx.reply(
       'No recent /playbook list to pick from. Run /playbook list first.',

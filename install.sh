@@ -505,20 +505,37 @@ process.stdin.on("end", () => {
     return
   fi
 
-  case "$choice" in
-    ''|*[!0-9]*)
-      # Non-numeric input — treat as a raw agent ID
-      echo "$choice"
-      ;;
-    *)
-      if [ "$choice" -ge 1 ] && [ "$choice" -le "$i" ]; then
-        echo "${ids[$((choice - 1))]}"
-      else
-        warn "Selection out of range — using the entered value as a raw agent ID."
+  # If choice is numeric, validate against the list size and re-prompt on
+  # out-of-range. Out-of-range integers almost never resolve to a real Maestro
+  # agent ID, so silently accepting them used to fail later at start time.
+  while :; do
+    case "$choice" in
+      ''|*[!0-9]*)
+        # Non-numeric input — treat as a raw agent ID and stop prompting.
         echo "$choice"
-      fi
-      ;;
-  esac
+        return
+        ;;
+      *)
+        if [ "$choice" -ge 1 ] && [ "$choice" -le "$i" ]; then
+          echo "${ids[$((choice - 1))]}"
+          return
+        fi
+        warn "Selection out of range (pick 1-$i, or paste an agent ID)."
+        if [ -r /dev/tty ]; then
+          read -r -p "  Re-pick: " choice </dev/tty || choice=""
+          if [ -z "$choice" ]; then
+            warn "No selection made — type the agent ID manually."
+            prompt_var TELEGRAM_AGENT_ID 'Maestro agent ID'
+            return
+          fi
+        else
+          warn "Non-interactive shell — type the agent ID manually."
+          prompt_var TELEGRAM_AGENT_ID 'Maestro agent ID'
+          return
+        fi
+        ;;
+    esac
+  done
 }
 
 config_complete() {

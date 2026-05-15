@@ -44,7 +44,16 @@ export async function dispatchCommand(
   if (!match) return false;
 
   const [, head, rest] = match;
-  const command = head.split('@', 1)[0].toLowerCase();
+  // Telegram group convention: `/cmd@BotUsername` disambiguates among multiple
+  // bots in a chat. Only handle the command when the suffix targets *this*
+  // bot — otherwise return false so the message handler can ignore it.
+  const atIdx = head.indexOf('@');
+  if (atIdx !== -1) {
+    const targetBot = head.slice(atIdx + 1).toLowerCase();
+    const ourBot = ctx.bot.botInfo?.username?.toLowerCase();
+    if (!ourBot || targetBot !== ourBot) return false;
+  }
+  const command = head.slice(0, atIdx === -1 ? head.length : atIdx).toLowerCase();
 
   const entry = COMMANDS[command];
   if (!entry) return false;

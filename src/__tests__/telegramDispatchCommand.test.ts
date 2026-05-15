@@ -13,7 +13,7 @@ function makeCtx(overrides: Partial<DispatchCommandContext> = {}): {
 } {
   const replies: string[] = [];
   const ctx: DispatchCommandContext = {
-    bot: {} as DispatchCommandContext['bot'],
+    bot: { botInfo: { username: 'MyBot' } } as DispatchCommandContext['bot'],
     chatId: 'chat-1',
     threadId: undefined,
     fromUserId: 'user-1',
@@ -88,7 +88,7 @@ test('dispatchCommand splits positional args on whitespace', async () => {
   }
 });
 
-test('dispatchCommand strips @<botname> suffix from the command word', async () => {
+test('dispatchCommand accepts @<botname> suffix matching our bot username', async () => {
   const seen: TelegramCommandContext[] = [];
   const original = COMMANDS.agents.execute;
   COMMANDS.agents.execute = async (cmdCtx) => {
@@ -100,6 +100,38 @@ test('dispatchCommand strips @<botname> suffix from the command word', async () 
     assert.equal(handled, true);
     assert.equal(seen.length, 1);
     assert.deepEqual(seen[0].args, ['list']);
+  } finally {
+    COMMANDS.agents.execute = original;
+  }
+});
+
+test('dispatchCommand is case-insensitive for the @<botname> suffix', async () => {
+  const seen: TelegramCommandContext[] = [];
+  const original = COMMANDS.agents.execute;
+  COMMANDS.agents.execute = async (cmdCtx) => {
+    seen.push(cmdCtx);
+  };
+  try {
+    const { ctx } = makeCtx();
+    const handled = await dispatchCommand('/agents@mybot list', ctx);
+    assert.equal(handled, true);
+    assert.deepEqual(seen[0].args, ['list']);
+  } finally {
+    COMMANDS.agents.execute = original;
+  }
+});
+
+test('dispatchCommand returns false when @<botname> suffix targets a different bot', async () => {
+  const seen: TelegramCommandContext[] = [];
+  const original = COMMANDS.agents.execute;
+  COMMANDS.agents.execute = async (cmdCtx) => {
+    seen.push(cmdCtx);
+  };
+  try {
+    const { ctx } = makeCtx();
+    const handled = await dispatchCommand('/agents@OtherBot list', ctx);
+    assert.equal(handled, false, 'command targeting another bot must not dispatch');
+    assert.equal(seen.length, 0);
   } finally {
     COMMANDS.agents.execute = original;
   }
