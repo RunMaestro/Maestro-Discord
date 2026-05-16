@@ -67,7 +67,7 @@ function baseDeps(overrides: Partial<Parameters<typeof createMessageHandler>[0]>
     downloadVoice: async () => {
       throw new Error('not used');
     },
-    attachmentsFromMessage: async () => [],
+    attachmentsFromMessage: () => [],
     transcribeVoiceAttachment: async () => '',
     isTranscriberAvailable: () => false,
     logger: { warn: () => undefined, error: () => undefined },

@@ -22,6 +22,8 @@ export async function downloadVoice(
   if (!msg.voice) {
     throw new Error('downloadVoice called on a message without a voice payload');
   }
+  // Voice is consumed immediately by transcribeVoiceAttachment in the
+  // messageHandler (before enqueue), so pre-resolving the URL is fine.
   const url = await fileUrl(bot, msg.voice.file_id);
   return {
     url,
@@ -31,53 +33,84 @@ export async function downloadVoice(
   };
 }
 
-export async function attachmentsFromMessage(
+/**
+ * Build a deferred-URL `IncomingAttachment` for a Telegram file. The actual
+ * `getFile` call is delayed until the kernel's `downloadAttachments` runs
+ * via the `resolveUrl` callback. This avoids using a stale URL when the
+ * per-conversation queue is backlogged behind long agent runs (Telegram
+ * getFile URLs are only valid for ~1h).
+ */
+function lazyTelegramAttachment(
+  bot: Bot,
+  fileId: string,
+  name: string,
+  size: number,
+  contentType: string | undefined,
+): IncomingAttachment {
+  return {
+    url: '',
+    name,
+    size,
+    contentType,
+    resolveUrl: () => fileUrl(bot, fileId),
+  };
+}
+
+export function attachmentsFromMessage(
   bot: Bot,
   msg: TelegramMessage,
-): Promise<IncomingAttachment[]> {
+): IncomingAttachment[] {
   const attachments: IncomingAttachment[] = [];
 
   if (msg.document) {
-    const url = await fileUrl(bot, msg.document.file_id);
-    attachments.push({
-      url,
-      name: msg.document.file_name ?? `document-${msg.message_id}`,
-      size: msg.document.file_size ?? 0,
-      contentType: msg.document.mime_type,
-    });
+    attachments.push(
+      lazyTelegramAttachment(
+        bot,
+        msg.document.file_id,
+        msg.document.file_name ?? `document-${msg.message_id}`,
+        msg.document.file_size ?? 0,
+        msg.document.mime_type,
+      ),
+    );
   }
 
   if (msg.photo && msg.photo.length > 0) {
     const largest = msg.photo.reduce((a, b) =>
       (a.file_size ?? a.width * a.height) >= (b.file_size ?? b.width * b.height) ? a : b,
     );
-    const url = await fileUrl(bot, largest.file_id);
-    attachments.push({
-      url,
-      name: `photo-${msg.message_id}.jpg`,
-      size: largest.file_size ?? 0,
-      contentType: 'image/jpeg',
-    });
+    attachments.push(
+      lazyTelegramAttachment(
+        bot,
+        largest.file_id,
+        `photo-${msg.message_id}.jpg`,
+        largest.file_size ?? 0,
+        'image/jpeg',
+      ),
+    );
   }
 
   if (msg.audio) {
-    const url = await fileUrl(bot, msg.audio.file_id);
-    attachments.push({
-      url,
-      name: msg.audio.file_name ?? `audio-${msg.message_id}`,
-      size: msg.audio.file_size ?? 0,
-      contentType: msg.audio.mime_type ?? 'audio/mpeg',
-    });
+    attachments.push(
+      lazyTelegramAttachment(
+        bot,
+        msg.audio.file_id,
+        msg.audio.file_name ?? `audio-${msg.message_id}`,
+        msg.audio.file_size ?? 0,
+        msg.audio.mime_type ?? 'audio/mpeg',
+      ),
+    );
   }
 
   if (msg.video) {
-    const url = await fileUrl(bot, msg.video.file_id);
-    attachments.push({
-      url,
-      name: msg.video.file_name ?? `video-${msg.message_id}.mp4`,
-      size: msg.video.file_size ?? 0,
-      contentType: msg.video.mime_type ?? 'video/mp4',
-    });
+    attachments.push(
+      lazyTelegramAttachment(
+        bot,
+        msg.video.file_id,
+        msg.video.file_name ?? `video-${msg.message_id}.mp4`,
+        msg.video.file_size ?? 0,
+        msg.video.mime_type ?? 'video/mp4',
+      ),
+    );
   }
 
   return attachments;

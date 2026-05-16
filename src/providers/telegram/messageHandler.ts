@@ -108,7 +108,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
           attachments = [voiceAttachment];
         }
       } else {
-        attachments = await deps.attachmentsFromMessage(deps.bot, message);
+        attachments = deps.attachmentsFromMessage(deps.bot, message);
       }
 
       const authorName =

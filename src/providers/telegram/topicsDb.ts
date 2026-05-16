@@ -27,11 +27,24 @@ export const topicDb = {
 
   getByAgentId(agentId: string): TelegramAgentTopic[] {
     // ORDER BY created_at ASC so topics[0] is the original/default topic for
-    // the agent. findOrCreateAgentChannel relies on this ordering to return a
-    // stable channelId for /api/send.
+    // the agent. NOTE: returns rows from *every* chat the agent has ever had
+    // topics in. Use `getByAgentIdInChat` when you need to scope to the
+    // current bound chat (e.g. `findOrCreateAgentChannel`).
     return db
       .prepare('SELECT * FROM telegram_agent_topics WHERE agent_id = ? ORDER BY created_at ASC')
       .all(agentId) as TelegramAgentTopic[];
+  },
+
+  getByAgentIdInChat(chatId: string, agentId: string): TelegramAgentTopic[] {
+    // Chat-scoped variant of getByAgentId. Always prefer this in routing /
+    // outbound paths so a stale row from a previous TELEGRAM_CHAT_ID can't
+    // produce a (currentChatId, oldTopicId) pair that doesn't exist on
+    // Telegram.
+    return db
+      .prepare(
+        'SELECT * FROM telegram_agent_topics WHERE chat_id = ? AND agent_id = ? ORDER BY created_at ASC',
+      )
+      .all(chatId, agentId) as TelegramAgentTopic[];
   },
 
   updateSession(chatId: string, topicId: number, sessionId: string | null): void {

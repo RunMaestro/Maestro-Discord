@@ -190,11 +190,13 @@ export class TelegramProvider implements BridgeProvider {
     const agentName = (await this.resolveAgentName(agentId)) ?? agentId;
 
     if (this.chatMode === 'forum') {
-      // Use the oldest topic for this agent as the stable "default", or create
-      // one if none exist. `topicDb.getByAgentId` returns rows ordered by
-      // created_at ascending so topics[0] is the original/default topic — not
-      // the most recently created.
-      const topics = topicDb.getByAgentId(agentId);
+      // Use the oldest topic for this agent *in the currently bound chat* as
+      // the stable "default", or create one if none exist. Scoping to
+      // telegramConfig.chatId prevents a stale row from a previous
+      // TELEGRAM_CHAT_ID binding from being combined with the new chat id,
+      // which would yield a (currentChat, oldTopicId) pair that doesn't
+      // exist on Telegram.
+      const topics = topicDb.getByAgentIdInChat(telegramConfig.chatId, agentId);
       let topicId: number;
       if (topics.length === 0) {
         const created = await this.bot.api.createForumTopic(
